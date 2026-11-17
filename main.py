@@ -175,7 +175,6 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     vet_url = f"{base}?q={urllib.parse.quote('24小時急診獸醫院')}&ll={lat},{lon}&z=15"
     hotel_url = f"{base}?q={urllib.parse.quote('寵物旅館 寵物美容')}&ll={lat},{lon}&z=15"
     shop_url = f"{base}?q={urllib.parse.quote('寵物用品店')}&ll={lat},{lon}&z=15"
-
     html = (PET_MAP_HTML
             .replace("__OFFSET_X__", str(offset_x))
             .replace("__OFFSET_Y__", str(offset_y))
@@ -188,7 +187,7 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
             .replace("__VET_URL__", vet_url)
             .replace("__HOTEL_URL__", hotel_url)
             .replace("__SHOP_URL__", shop_url))
-   def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
+    def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
     S = chr(47)
     bind_cmd = urllib.parse.quote(f"綁定人員:{uid}")
     share_text = urllib.parse.quote(f"邀請您加入「汪喵平安守護 ＆ 寵物照護日記」守護群（不限人數）！點擊下方連結加入後，每次餵食、鏟屎、散步或異常狀況，您都會即時收到通知：\nhttps:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{bind_cmd}")
