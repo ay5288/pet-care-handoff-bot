@@ -20,7 +20,6 @@ LINE_BOT_BASIC_ID = "@650tsvlz"
 # ⚠️ 3. 請確認這個寵物機器人的 Render 公開網址（結尾不要加斜線）
 RENDER_BASE_URL = "https://pet-care-handoff-bot.onrender.com"
 
-
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
@@ -175,6 +174,7 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     vet_url = f"{base}?q={urllib.parse.quote('24小時急診獸醫院')}&ll={lat},{lon}&z=15"
     hotel_url = f"{base}?q={urllib.parse.quote('寵物旅館 寵物美容')}&ll={lat},{lon}&z=15"
     shop_url = f"{base}?q={urllib.parse.quote('寵物用品店')}&ll={lat},{lon}&z=15"
+
     html = (PET_MAP_HTML
             .replace("__OFFSET_X__", str(offset_x))
             .replace("__OFFSET_Y__", str(offset_y))
@@ -187,7 +187,8 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
             .replace("__VET_URL__", vet_url)
             .replace("__HOTEL_URL__", hotel_url)
             .replace("__SHOP_URL__", shop_url))
-    def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
+    return HTMLResponse(content=html)
+def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
     S = chr(47)
     bind_cmd = urllib.parse.quote(f"綁定人員:{uid}")
     share_text = urllib.parse.quote(f"邀請您加入「汪喵平安守護 ＆ 寵物照護日記」守護群（不限人數）！點擊下方連結加入後，每次餵食、鏟屎、散步或異常狀況，您都會即時收到通知：\nhttps:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{bind_cmd}")
@@ -275,7 +276,6 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     )
 
     return CarouselContainer(contents=[page1_home, page2_settings])
- return HTMLResponse(content=html)
 @app.post("/callback")
 async def callback(request: Request):
     sig = request.headers.get("X-Line-Signature", "")
@@ -364,7 +364,7 @@ def on_text(event):
             ]),
             footer=BoxComponent(layout="vertical", spacing="sm", contents=[
                 ButtonComponent(style="primary", color="#5856D6", height="sm", action=URIAction(label="📹 立即開啟視訊鏡頭", uri=video_uri)),
-                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報"))
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回 App 主畫面", text="今日日報"))
             ])
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="專屬視訊室已建立", contents=self_card))
