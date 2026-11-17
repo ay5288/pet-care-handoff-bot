@@ -360,8 +360,9 @@ def on_text(event):
     # 1. 處理日常一鍵照護打卡（格式：紀錄:類別:詳細內容）
     if txt.startswith("紀錄:"):
         parts = txt.split(":", 2)
-        cat = parts if len(parts) > 1 else "照護紀錄"
-        detail = parts if len(parts) > 2 else txt
+        _ = parts.pop(0)
+        cat = parts.pop(0) if parts else "照護紀錄"
+        detail = parts.pop(0) if parts else txt
         res = call_sheet({"action": "log_care", "user_id": uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": False})
         t_str = res.get("time", "剛剛")
         f_cnt = res.get("family_count", 0)
@@ -384,8 +385,9 @@ def on_text(event):
     # 1-1. 處理異常健康狀況預警（格式：異常:類別:詳細內容）
     if txt.startswith("異常:"):
         parts = txt.split(":", 2)
-        cat = parts if len(parts) > 1 else "健康異常"
-        detail = parts if len(parts) > 2 else txt
+        _ = parts.pop(0)
+        cat = parts.pop(0) if parts else "健康異常"
+        detail = parts.pop(0) if parts else txt
         res = call_sheet({"action": "log_care", "user_id": uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": True})
         t_str = res.get("time", "剛剛")
         f_cnt = res.get("family_count", 0)
@@ -404,7 +406,26 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩異常狀況通報", contents=card))
         return
 
-    # 1-2. 新增其他特別狀況（例如：狀況:今天在陽台曬太陽睡著了，精神很好）
+    # 1-2. 新增其他特別狀況（支援直接點按鈕預填或打字輸入）
+    if txt in ["新增狀況", "新增特別狀況"]:
+        S = chr(47)
+        note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
+        guide_card = BubbleContainer(
+            size="mega",
+            header=BoxComponent(layout="vertical", background_color="#FF9500", padding_all="14px", contents=[
+                TextComponent(text="✍️ 新增毛孩特別狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
+            ]),
+            body=BoxComponent(layout="vertical", spacing="sm", contents=[
+                TextComponent(text="請點擊下方按鈕（自動帶入「狀況:」），或直接在對話框輸入「狀況:內容」送出即可！", size="xs", color="#333333", wrap=True),
+                TextComponent(text="💡 範例：狀況:今天在陽台曬太陽睡著了，精神很好", size="xxs", color="#888888", wrap=True)
+            ]),
+            footer=BoxComponent(layout="vertical", contents=[
+                ButtonComponent(style="primary", color="#FF9500", height="sm", action=URIAction(label="✍️ 點此輸入特別狀況", uri=note_uri))
+            ])
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="新增毛孩特別狀況", contents=guide_card))
+        return
+
     if txt.startswith("狀況:") or txt.startswith("狀況：") or txt.startswith("備忘:") or txt.startswith("備忘："):
         note_content = txt[3:].strip()
         if not note_content:
@@ -470,9 +491,10 @@ def on_text(event):
 
     if txt.startswith("改狀況:"):
         parts = txt.split(":", 2)
-        if len(parts) >= 3 and parts[2].strip():
-            row_num = parts[1].strip()
-            new_text = parts[2].strip()
+        _ = parts.pop(0)
+        row_num = parts.pop(0).strip() if parts else ""
+        new_text = parts.pop(0).strip() if parts else ""
+        if row_num and new_text:
             call_sheet({"action": "edit_log", "user_id": uid, "row_num": row_num, "detail": new_text})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ 已成功修改該筆狀況為：「{new_text}」！\n輸入「今日日報」可查看最新完整紀錄。"))
         else:
@@ -726,4 +748,3 @@ def on_text(event):
         uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="今日寵物照護日報", contents=card))
-
