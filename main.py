@@ -5,7 +5,7 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
     MessageEvent, FollowEvent, TextMessage, LocationMessage, 
-    TextSendMessage, FlexSendMessage, BubbleContainer, 
+    TextSendMessage, FlexSendMessage, BubbleContainer, CarouselContainer,
     BoxComponent, TextComponent, ButtonComponent, URIAction, MessageAction
 )
 
@@ -19,6 +19,7 @@ GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbyXqSsQ5exQq4T-i4t4D
 LINE_BOT_BASIC_ID = "@650tsvlz"
 # ⚠️ 3. 請確認這個寵物機器人的 Render 公開網址（結尾不要加斜線）
 RENDER_BASE_URL = "https://pet-care-handoff-bot.onrender.com"
+
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
@@ -187,83 +188,95 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
             .replace("__VET_URL__", vet_url)
             .replace("__HOTEL_URL__", hotel_url)
             .replace("__SHOP_URL__", shop_url))
-    return HTMLResponse(content=html)
-def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
+   def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
     S = chr(47)
     bind_cmd = urllib.parse.quote(f"綁定人員:{uid}")
     share_text = urllib.parse.quote(f"邀請您加入「汪喵平安守護 ＆ 寵物照護日記」守護群（不限人數）！點擊下方連結加入後，每次餵食、鏟屎、散步或異常狀況，您都會即時收到通知：\nhttps:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{bind_cmd}")
     share_uri = f"https:{S}{S}line.me{S}R{S}share?text={share_text}"
     note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
     phone_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('飼主電話:')}"
-
     clean_phone = re.sub(r"[^0-9]", "", str(owner_phone or ""))
-    footer_btns = [
-        # 1. 飲食與飲水紀錄
-        ButtonComponent(style="primary", color="#1DB446", height="sm", action=MessageAction(label="🥣 放飯正常 / 食慾很好", text="紀錄:餵食:乾乾／罐罐已吃完，飲水正常")),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="😿 食慾較差 / 吃得很少", text="異常:餵食:今天食慾較差吃得很少，請留意")),
-        # 2. 鏟屎與排泄紀錄
-        ButtonComponent(style="primary", color="#007AFF", height="sm", action=MessageAction(label="💩 鏟屎正常 / 便便成形", text="紀錄:排泄:已清理貓砂／撿便，大小便正常")),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🚨 軟便／嘔吐（異常通知）", text="異常:健康:發現軟便或嘔吐狀況，已通知全家")),
-        # 3. 散步、驅蟲餵藥與一鍵視訊
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🐕 外出散步 / 陪玩放電", text="紀錄:活動:已完成外出散步與陪玩運動")),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="💊 已餵驅蟲／保健品", text="紀錄:保健:已按時餵食驅蟲藥／保健品")),
-        ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 新增其他特別狀況", uri=note_uri)),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 設定放飯／驅蟲鬧鐘", text="餵食時間")),
-        ButtonComponent(style="primary", color="#5856D6", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩（免下載）", text="開啟視訊")),
-        # 4. 一鍵直撥飼主緊急電話（已設定時同時提供修改／刪除入口）
-        *(
-            [
-                ButtonComponent(
-                    style="primary", color="#FF9500", height="sm",
-                    action=URIAction(label=f"📞 撥打飼主 ({clean_phone})", uri=f"{RENDER_BASE_URL}/call?num={clean_phone}&name={urllib.parse.quote('毛孩飼主緊急聯絡人')}&openExternalBrowser=1")
-                ),
-                ButtonComponent(
-                    style="secondary", height="sm",
-                    action=MessageAction(label="✏️ 修改／刪除飼主電話", text="管理飼主電話")
-                )
-            ]
-            if len(clean_phone) >= 8 else
-            [
-                ButtonComponent(
-                    style="secondary", height="sm",
-                    action=URIAction(label="📞 設定飼主緊急聯絡電話", uri=phone_uri)
-                )
-            ]
-        ),
-        # 5. 新增／修改／刪除人員、今日日報與修改／刪除狀況
-        ButtonComponent(style="secondary", height="sm", action=URIAction(label="👨‍👩‍👧 新增家人／保母 (不限人數)", uri=share_uri)),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="👥 修改／刪除已綁定人員名單", text="管理人員")),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 查看今日寵物照護日報", text="今日日報")),
-        ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 修改／刪除今日狀況紀錄", text="修改狀況"))
+
+    # 【App 第 1 頁：汪喵日常照護九宮格主畫面】
+    page1_home = BubbleContainer(
+        size="mega",
+        header=BoxComponent(layout="vertical", background_color="#FF9500", padding_all="14px", contents=[
+            TextComponent(text=title, weight="bold", size="md", color="#FFFFFF", wrap=True),
+            TextComponent(text=subtitle, size="xs", color="#FFF4E5", wrap=True, margin="xs")
+        ]),
+        body=BoxComponent(layout="vertical", spacing="md", contents=[
+            BoxComponent(layout="vertical", background_color="#FFF9EB", corner_radius="10px", padding_all="12px", contents=[
+                TextComponent(text=status_text, size="xs", color="#333333", wrap=True)
+            ]),
+            # App 九宮格第 1 排：放飯 ＋ 鏟屎
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="primary", color="#1DB446", height="sm", action=MessageAction(label="🥣 放飯正常", text="紀錄:餵食:乾乾／罐罐已吃完，飲水正常")),
+                ButtonComponent(style="primary", color="#007AFF", height="sm", action=MessageAction(label="💩 鏟屎正常", text="紀錄:排泄:已清理貓砂／撿便，大小便正常"))
+            ]),
+            # App 九宮格第 2 排：散步 ＋ 餵藥保健
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="primary", color="#FF9500", height="sm", action=MessageAction(label="🐕 外出散步", text="紀錄:活動:已完成外出散步與陪玩運動")),
+                ButtonComponent(style="primary", color="#5856D6", height="sm", action=MessageAction(label="💊 餵保健品", text="紀錄:保健:已按時餵食驅蟲藥／保健品"))
+            ]),
+            # App 九宮格第 3 排：異常預警快捷鍵
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="😿 食慾較差", text="異常:餵食:今天食慾較差吃得很少，請留意")),
+                ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🚨 軟便嘔吐", text="異常:健康:發現軟便或嘔吐狀況，已通知全家"))
+            ])
+        ]),
+        footer=BoxComponent(layout="vertical", spacing="sm", contents=[
+            ButtonComponent(style="primary", color="#5856D6", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩（免下載 App）", text="開啟視訊")),
+            ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 新增其他特別狀況　｜　👉 往左滑進入設定", uri=note_uri))
+        ])
+    )
+
+    # 【App 第 2 頁（往左滑）：守護群管理、緊急聯絡與急診地圖設定中心】
+    settings_btns = [
+        BoxComponent(layout="horizontal", spacing="sm", contents=[
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="👥 管理人員", text="管理人員"))
+        ]),
+        BoxComponent(layout="horizontal", spacing="sm", contents=[
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 放飯鬧鐘", text="餵食時間")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 地址管理", text="管理地址"))
+        ]),
+        ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="👨‍👩‍👧 邀請家人／保母加入（不限人數）", uri=share_uri))
     ]
 
-    # 6. 24H 急診獸醫院地圖與地址管理
+    if len(clean_phone) >= 8:
+        settings_btns.append(
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="primary", color="#FF9500", height="sm", action=URIAction(label=f"📞 撥打 ({clean_phone})", uri=f"{RENDER_BASE_URL}/call?num={clean_phone}&name={urllib.parse.quote('毛孩飼主緊急聯絡人')}&openExternalBrowser=1")),
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪電話", text="管理飼主電話"))
+            ])
+        )
+    else:
+        settings_btns.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label="📞 設定飼主緊急聯絡電話", uri=phone_uri)))
+
     clean_addr_only = next(iter(str(addr).split("("))).strip() if "(" in str(addr) else str(addr).strip()
     if lat is not None and lon is not None:
         enc_addr = urllib.parse.quote(clean_addr_only or "毛孩住家")
         map_uri = f"{RENDER_BASE_URL}/pet_map?lat={lat}&lon={lon}&addr={enc_addr}&openExternalBrowser=1"
-        footer_btns.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=map_uri)))
+        settings_btns.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=map_uri)))
     elif clean_addr_only and clean_addr_only != "尚未設定":
         host = "maps." + "google.com"
         q_uri = f"https:{S}{S}{host}{S}?q={urllib.parse.quote(clean_addr_only + ' 附近24小時急診獸醫院')}"
-        footer_btns.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=q_uri)))
+        settings_btns.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=q_uri)))
 
-    footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 住家／寄宿地址設定修改刪除", text="管理地址")))
-
-    return BubbleContainer(
+    page2_settings = BubbleContainer(
         size="mega",
-        header=BoxComponent(layout="vertical", background_color="#FF9500", padding_all="14px", contents=[
-            TextComponent(text=title, weight="bold", size="md", color="#FFFFFF", wrap=True)
+        header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            TextComponent(text="⚙️ App 守護群與設備設定中心", weight="bold", size="md", color="#FFFFFF", wrap=True),
+            TextComponent(text="管理家人保母、修改狀況、鬧鐘與急診地圖", size="xs", color="#BDC3C7", wrap=True, margin="xs")
         ]),
-        body=BoxComponent(layout="vertical", spacing="md", contents=[
-            TextComponent(text=subtitle, size="sm", weight="bold", color="#111111", wrap=True),
-            BoxComponent(layout="vertical", background_color="#FFF9EB", corner_radius="8px", padding_all="12px", contents=[
-                TextComponent(text=status_text, size="xs", color="#333333", wrap=True)
-            ]),
-            TextComponent(text="🐾 點擊下方按鈕一秒打卡，家人／飼主手機會立刻收到照護交班通知！", size="xxs", color="#666666", wrap=True)
-        ]),
-        footer=BoxComponent(layout="vertical", spacing="sm", contents=footer_btns)
+        body=BoxComponent(layout="vertical", spacing="sm", contents=settings_btns),
+        footer=BoxComponent(layout="vertical", contents=[
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 刷新並回到 App 主畫面", text="今日日報"))
+        ])
     )
+
+    return CarouselContainer(contents=[page1_home, page2_settings])
+ return HTMLResponse(content=html)
 @app.post("/callback")
 async def callback(request: Request):
     sig = request.headers.get("X-Line-Signature", "")
@@ -284,8 +297,8 @@ def on_follow(event):
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
         "🐾 汪喵平安守護 ＆ 照護日記 · 已啟動",
-        f"嗨 {uname}！歡迎使用毛孩交班守護系統：",
-        "點擊下方任何一顆按鈕（放飯、鏟屎、散步、視訊或新增特別狀況），已綁定的家人與飼主都會即時收到通知！",
+        f"嗨 {uname}！歡迎使用毛孩交班守護 App：",
+        "點擊下方九宮格按鈕（放飯、鏟屎、散步、視訊或新增特別狀況），已綁定的家人與飼主都會即時收到通知！",
         uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="汪喵平安守護已啟動", contents=card))
@@ -302,7 +315,7 @@ def on_location(event):
     card = make_pet_card(
         "📍 毛孩住家／寄宿定位與獸醫院地圖已開通",
         "已將此位置設為毛孩的照護座標：",
-        f"🏠 登記位置：{addr}\n🏥 點擊下方紅色按鈕，可立即搜尋最近的 24小時急診獸醫院、寵物旅館與用品店！",
+        f"🏠 登記位置：{addr}\n🏥 往左滑進入設定頁點擊紅色按鈕，即可搜尋附近 24小時急診獸醫院！",
         uid, lat=lat, lon=lon, addr=addr, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩定位更新成功", contents=card))
@@ -372,7 +385,7 @@ def on_text(event):
         loc_str = st.get("last_location", "尚未設定")
         lat, lon = parse_latlon(loc_str)
 
-        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（點下方按鈕可邀請加入）"
+        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（往左滑進入設定可邀請加入）"
         card = make_pet_card(
             f"✅ {cat}已紀錄完成",
             f"毛孩：{pet_n}　｜　時間：{t_str}",
@@ -400,13 +413,13 @@ def on_text(event):
         card = make_pet_card(
             "🚨 毛孩異常狀況已記錄並通報！",
             f"毛孩：{pet_n}　｜　時間：{t_str}",
-            f"⚠️ 異常內容：{detail}\n🔔 已優先發送警報通知 {f_cnt} 位家人／飼主！如需就醫可點擊下方紅色按鈕搜尋 24H 急診獸醫院。",
+            f"⚠️ 異常內容：{detail}\n🔔 已優先發送警報通知 {f_cnt} 位家人／飼主！如需就醫請往左滑開啟 24H 急診獸醫院地圖。",
             uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩異常狀況通報", contents=card))
         return
 
-    # 1-2. 新增其他特別狀況（支援直接點按鈕預填或打字輸入）
+    # 1-2. 新增其他特別狀況（支援底部選單按鈕或直接輸入）
     if txt in ["新增狀況", "新增特別狀況"]:
         S = chr(47)
         note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
@@ -440,7 +453,7 @@ def on_text(event):
         loc_str = st.get("last_location", "尚未設定")
         lat, lon = parse_latlon(loc_str)
 
-        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（點下方按鈕可邀請加入）"
+        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（往左滑進入設定可邀請加入）"
         card = make_pet_card(
             "✍️ 特別狀況已新增完成",
             f"毛孩：{pet_n}　｜　時間：{t_str}",
@@ -475,7 +488,7 @@ def on_text(event):
                 )
 
         footer_items.append(
-            ButtonComponent(style="primary", color="#FF9500", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報"))
+            ButtonComponent(style="primary", color="#FF9500", height="sm", action=MessageAction(label="📊 返回 App 主畫面", text="今日日報"))
         )
 
         edit_card = BubbleContainer(
@@ -560,7 +573,7 @@ def on_text(event):
             footer=BoxComponent(layout="vertical", spacing="sm", contents=[
                 ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="✏️ 輸入／修改新號碼", uri=edit_phone_uri)),
                 ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🗑️ 刪除目前飼主電話", text="刪除飼主電話")),
-                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報"))
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回 App 主畫面", text="今日日報"))
             ])
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急電話管理", contents=phone_card))
@@ -574,7 +587,7 @@ def on_text(event):
         card = make_pet_card(
             "🗑️ 飼主緊急電話已刪除",
             "已清空原本登記的飼主聯絡號碼",
-            "主畫面按鈕已恢復為「📞 設定飼主緊急聯絡電話」，隨時可重新設定新號碼！",
+            "設定頁按鈕已恢復為「📞 設定飼主緊急聯絡電話」，隨時可重新設定新號碼！",
             uid, lat=lat, lon=lon, addr=loc_str, owner_phone="尚未設定"
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急電話已刪除", contents=card))
@@ -592,7 +605,7 @@ def on_text(event):
         card = make_pet_card(
             "📞 飼主緊急直撥電話已設定",
             f"緊急聯絡號碼：{p_val}",
-            "現在只要點擊下方橘色按鈕，系統就會透過外部瀏覽器直接喚醒手機撥號盤聯繫飼主！",
+            "現在只要往左滑進入設定頁點擊橘色按鈕，即可直接喚醒手機撥號盤聯繫飼主！",
             uid, lat=lat, lon=lon, addr=loc_str, owner_phone=p_val
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急直撥電話已設定", contents=card))
@@ -618,7 +631,7 @@ def on_text(event):
                 ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="✏️ 直接輸入／修改文字地址", uri=edit_addr_uri)),
                 ButtonComponent(style="secondary", height="sm", action=URIAction(label="📍 傳送 GPS 定位座標", uri=loc_uri)),
                 ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🗑️ 刪除目前登記地址", text="刪除地址")),
-                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報"))
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回 App 主畫面", text="今日日報"))
             ])
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址管理", contents=addr_card))
@@ -637,7 +650,7 @@ def on_text(event):
         card = make_pet_card(
             "🏠 毛孩住家／寄宿地址已更新",
             f"登記地址：{new_loc}",
-            "現在點擊下方紅色地圖按鈕，即可直接搜尋附近 24小時急診獸醫院與寵物旅館！",
+            "現在往左滑進入設定頁點擊紅色地圖按鈕，即可直接搜尋附近 24小時急診獸醫院與寵物旅館！",
             uid, lat=lat, lon=lon, addr=new_loc, owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址已更新", contents=card))
@@ -650,7 +663,7 @@ def on_text(event):
         card = make_pet_card(
             "🗑️ 毛孩住家地址已刪除",
             "已清空原本登記的地址與定位座標",
-            "隨時可點擊下方「🏠 住家／寄宿地址設定修改刪除」重新登記新位置！",
+            "隨時可往左滑點擊「🏠 地址管理」重新登記新位置！",
             uid, addr="尚未設定", owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址已刪除", contents=card))
@@ -686,7 +699,7 @@ def on_text(event):
             )
 
         footer_btns.append(ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="➕ 新增家人／保母（不限人數）", uri=share_uri)))
-        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報")))
+        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回 App 主畫面", text="今日日報")))
 
         fam_card = BubbleContainer(
             size="mega",
@@ -730,7 +743,7 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 8. 查看今日寵物照護日報與主操作面板
+    # 8. 查看今日寵物照護日報與 App 主畫面
     st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
     p_name = st.get("pet_name", "毛孩寶貝")
     f_cnt = st.get("family_count", 0)
@@ -738,13 +751,13 @@ def on_text(event):
     c_times = st.get("care_times", "尚未設定")
     loc_str = st.get("last_location", "尚未設定")
     logs = st.get("today_logs", [])
-    logs_txt = "\n".join(logs) if len(logs) > 0 else "（今日尚無紀錄，點擊下方按鈕即可開始為毛孩打卡交班）"
+    logs_txt = "\n".join(logs) if len(logs) > 0 else "（今日尚無紀錄，點擊下方九宮格按鈕即可開始為毛孩打卡交班）"
 
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
         f"🐾 {p_name} · 今日寵物照護日報",
-        f"守護群：{f_cnt} 位（不限上限） ｜ 放飯鬧鐘：{c_times}",
-        f"{logs_txt}\n\n🏠 登記位置：{loc_str}\n💡 輸入「毛孩:橘子」可改名字；點「✍️ 新增其他特別狀況」可自由輸入備忘。",
+        f"守護群：{f_cnt} 位（不限上限） ｜ 鬧鐘：{c_times}",
+        f"{logs_txt}\n\n🏠 登記位置：{loc_str}\n💡 輸入「毛孩:橘子」可改名字；往左滑可管理人員、改刪狀況與開地圖。",
         uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="今日寵物照護日報", contents=card))
