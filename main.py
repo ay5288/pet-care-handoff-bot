@@ -116,7 +116,7 @@ def get_user_name(uid: str):
 
 @app.get("/")
 def root():
-    return {"status": "Online", "service": "Pet Care Handoff Bot 8.0"}
+    return {"status": "Online", "service": "Pet Care Handoff Bot 8.1"}
 
 @app.get("/pet_photo/{photo_id}")
 def serve_pet_photo(photo_id: str):
@@ -362,11 +362,11 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
         ]),
         TextComponent(text="📸 照片頭貼相簿、視訊與狀況", size="xxs", color="#868E96", weight="bold", margin="md"),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="primary", color="#7048E8", height="sm", action=MessageAction(label="📹 視訊看毛孩", text="開啟視訊")),
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🖼️ 相簿/設頭貼({photo_cnt})", text="管理相簿"))
+            ButtonComponent(style="primary", color="#7048E8", height="sm", action=MessageAction(label="📹 開視訊", text="開啟視訊")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🖼️ 相簿({photo_cnt})", text="管理相簿"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✍️ 記狀況/傳照", text="新增狀況")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✍️ 記狀況", text="新增狀況")),
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="📤 轉傳交班", uri=report_share_uri))
         ]),
         TextComponent(text="🩺 雲端健康護照與看診摘要", size="xxs", color="#868E96", weight="bold", margin="md"),
@@ -473,7 +473,7 @@ def on_follow(event):
     loc_str = st.get("last_location", "尚未設定")
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
-        f"🐾 {active_pet} · 汪喵平安守護 8.0 已啟動",
+        f"🐾 {active_pet} · 汪喵平安守護 8.1 已啟動",
         f"嗨 {uname}！支援不限張數相簿、自選大頭貼與走失協尋：",
         "點擊下方馬卡龍快捷按鈕，或直接傳送毛孩照片（自動顯示在卡片最上方），已綁定的家人與飼主都會即時收到通知！",
         scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
@@ -541,7 +541,7 @@ def on_image(event):
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
         f"📸 {active_pet} · 相簿與大頭貼已更新",
-        f"共 {len(pet_list)} 隻毛孩 ｜ 點「🖼️ 相簿/設頭貼」可選大頭貼或刪改照片",
+        f"共 {len(pet_list)} 隻毛孩 ｜ 點「🖼️ 相簿」可選大頭貼或刪改照片",
         f"{logs_txt}\n\n🏠 位置：{loc_str}",
         scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
@@ -600,7 +600,6 @@ def on_text(event):
         return
 
     # 0-1. 相簿與大頭貼管理中心（不限張數、設為頭貼、替換修改照片、刪除照片）
-        # 0-1. 相簿與大頭貼管理中心（不限張數、設為頭貼、替換修改照片、刪除照片）
     if txt in ["管理相簿", "相簿", "設頭貼", "毛孩相簿"]:
         gal = PET_GALLERY_CACHE.get(safe_key, [])
         cur_avatar = PET_AVATAR_MAP.get(safe_key, "")
@@ -639,7 +638,6 @@ def on_text(event):
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩相簿與頭貼管理", contents=gal_card))
         return
-
 
     if txt.startswith("設頭貼:"):
         target_pid = txt[4:].strip()
@@ -1191,7 +1189,7 @@ def on_text(event):
             body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFF5F5", contents=[
                 TextComponent(text=f"📍 最後走失地點：{clean_addr}", size="xs", color="#111111", weight="bold", wrap=True),
                 TextComponent(text=f"📞 飼主緊急電話：{o_phone}", size="xs", color="#111111", weight="bold", wrap=True),
-                TextComponent(text="💡 提示：協尋海報已自動放上目前設定的大頭貼照片，點「🖼️ 相簿/設頭貼」可隨時更換！", size="xxs", color="#C92A2A", wrap=True, margin="sm")
+                TextComponent(text="💡 提示：協尋海報已自動放上目前設定的大頭貼照片，點「🖼️ 相簿」可隨時更換！", size="xxs", color="#C92A2A", wrap=True, margin="sm")
             ]),
             footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFF5F5", contents=[
                 ButtonComponent(style="primary", color="#C92A2A", height="sm", action=URIAction(label="🖼️ 開啟專屬尋寵協尋海報網頁", uri=poster_uri)),
@@ -1219,20 +1217,14 @@ def on_text(event):
         footer_btns = []
         for p_item in pet_list:
             is_cur = (p_item == active_pet)
-            footer_btns.append(
-                ButtonComponent(
-                    style="primary" if is_cur else "secondary",
-                    color="#12B886" if is_cur else None,
-                    height="sm",
-                    action=MessageAction(label=f"{'✅ 目前：' if is_cur else '🐾 切換至：'}{p_item}"[:38], text=f"切換至:{p_item}")
-                )
-            )
-            if len(pet_list) > 1 and not is_cur:
-                footer_btns.append(
-                    ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除毛孩檔案：{p_item}"[:38], text=f"刪毛孩:{p_item}"))
-                )
+            if is_cur:
+                footer_btns.append(ButtonComponent(style="primary", color="#12B886", height="sm", action=MessageAction(label=f"✅ 目前：{p_item}"[:20], text=f"切換至:{p_item}")))
+            else:
+                footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🐾 切換：{p_item}"[:20], text=f"切換至:{p_item}")))
+                if len(pet_list) > 1:
+                    footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除：{p_item}"[:20], text=f"刪毛孩:{p_item}")))
 
-        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label=f"✏️ 更改「{active_pet}」的名字"[:38], uri=rename_pet_uri)))
+        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label=f"✏️ 更改「{active_pet}」名字"[:20], uri=rename_pet_uri)))
         footer_btns.append(ButtonComponent(style="primary", color="#228BE6", height="sm", action=URIAction(label="➕ 新增另一隻毛孩檔案", uri=add_pet_uri)))
         footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報")))
 
@@ -1315,7 +1307,7 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 10. 查看今日寵物照護日報（旗艦 8.0 視覺頭貼相簿旗艦版）
+    # 10. 查看今日寵物照護日報（旗艦 8.1 視覺頭貼相簿旗艦版）
     st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     f_cnt = st.get("family_count", 0)
     o_phone = st.get("owner_phone", "尚未設定")
