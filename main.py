@@ -4,8 +4,8 @@ from fastapi.responses import HTMLResponse
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
-    MessageEvent, FollowEvent, TextMessage, LocationMessage, 
-    TextSendMessage, FlexSendMessage, BubbleContainer, 
+    MessageEvent, FollowEvent, TextMessage, LocationMessage, ImageMessage,
+    TextSendMessage, FlexSendMessage, BubbleContainer, ImageComponent,
     BoxComponent, TextComponent, ButtonComponent, URIAction, MessageAction
 )
 
@@ -52,26 +52,28 @@ PET_MAP_HTML = """<!DOCTYPE html><html><head><meta charset="UTF-8">
 <div class="map-viewport"><div class="map-canvas"><div class="tile-grid">__TILES__</div><svg class="overlay-svg" viewBox="0 0 768 768">__SVG_MARKS__</svg></div></div>
 <div class="box">
   <div class="card">
-    <div class="title">📍 毛孩住家／寄宿位置</div>
+    <div class="title">📍 毛孩住家／走失協尋定位</div>
     <div class="meta">__ADDR__<br>座標：__LAT__, __LON__</div>
     <a class="btn btn-blue" href="__NAV_URL__">🧭 導航前往此位置</a>
   </div>
   <div class="card">
-    <div class="title">🏥 周邊 24H 急診獸醫院、寵物旅館與用品店</div>
+    <div class="title">🏥 周邊 24H 急診獸醫院、動保處與寵物店</div>
     <a class="btn btn-red" href="__VET_URL__">🚨 搜尋附近 24小時急診獸醫院</a>
-    <a class="btn btn-green" href="__HOTEL_URL__">🏨 搜尋附近寵物旅館／美容</a>
-    <a class="btn btn-blue" href="__SHOP_URL__">🦴 搜尋附近寵物用品／飼料店</a>
+    <a class="btn btn-green" href="__HOTEL_URL__">🏛️ 搜尋附近動保處／動物之家</a>
+    <a class="btn btn-blue" href="__SHOP_URL__">🦴 搜尋附近寵物用品／寵物旅館</a>
   </div>
 </div>
 </body></html>"""
 ACTIVE_PET_MAP = {}
 PET_LIST_MAP = {}
+PENDING_STATE = {}
+PET_PHOTO_CACHE = {}
 
 def get_pet_scope(uid: str, default_name: str = "毛孩寶貝"):
     pets = PET_LIST_MAP.get(uid, [])
     active = ACTIVE_PET_MAP.get(uid, "")
     if not active:
-        active = pets[0] if len(pets) > 0 else default_name
+        active = pets if len(pets) > 0 else default_name
     if active and active not in pets:
         pets.append(active)
         PET_LIST_MAP[uid] = pets
@@ -103,7 +105,7 @@ def call_sheet(payload: dict):
         return {}
 
 def get_user_name(uid: str):
-    base_uid = uid.split("#")[0] if "#" in uid else uid
+    base_uid = uid.split("#") if "#" in uid else uid
     try:
         profile = line_bot_api.get_profile(base_uid)
         return profile.display_name
@@ -112,7 +114,50 @@ def get_user_name(uid: str):
 
 @app.get("/")
 def root():
-    return {"status": "Online", "service": "Pet Care Handoff Bot Multi-Pet"}
+    return {"status": "Online", "service": "Pet Care Handoff Bot 6.0"}
+
+@app.get("/pet_photo/{scope_key}")
+def serve_pet_photo(scope_key: str):
+    img_bytes = PET_PHOTO_CACHE.get(scope_key)
+    if not img_bytes:
+        raise HTTPException(status_code=404, detail="No photo uploaded yet")
+    from fastapi.responses import Response
+    return Response(content=img_bytes, media_type="image/jpeg")
+
+@app.get("/lost_poster", response_class=HTMLResponse)
+def lost_poster_page(scope_key: str, pet: str = "毛孩寶貝", addr: str = "新北市五股區", phone: str = "請私訊聯繫", desc: str = "請大家幫忙留意協尋！"):
+    S = chr(47)
+    safe_pet = pet.replace("<", "").replace(">", "")
+    safe_addr = addr.replace("<", "").replace(">", "")
+    safe_phone = re.sub(r"[^0-9+]", "", phone) or phone.replace("<", "").replace(">", "")
+    safe_desc = desc.replace("<", "").replace(">", "")
+    has_photo = scope_key in PET_PHOTO_CACHE
+    photo_html = f'<img src="{RENDER_BASE_URL}{S}pet_photo{S}{scope_key}" style="width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin:12px 0;border:3px solid #FA5252;"/>' if has_photo else '<div style="background:#FFF5F5;border:2px dashed #FA5252;border-radius:12px;padding:24px;margin:12px 0;color:#C92A2A;font-weight:bold;">🐾 協尋緊急通報（飼主可於 LINE 傳送毛孩照片自動顯示於此）</div>'
+    call_btn = f'<a class="btn" style="background:#12B886;" href="tel:{safe_phone}">📞 發現毛孩！立即撥打 {safe_phone}</a>' if len(safe_phone) >= 8 else ""
+    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>🚨 緊急協尋走失毛孩：{safe_pet}</title>
+    <style>
+      body {{ font-family: -apple-system, sans-serif; margin: 0; padding: 16px; background: #FFF5F5; text-align: center; }}
+      .poster {{ background: #fff; border: 4px solid #FA5252; border-radius: 18px; padding: 20px; max-width: 460px; margin: 0 auto; box-shadow: 0 6px 20px rgba(250,82,82,0.2); }}
+      .badge {{ background: #FA5252; color: #fff; font-size: 20px; font-weight: bold; padding: 10px; border-radius: 10px; letter-spacing: 2px; }}
+      .name {{ font-size: 30px; font-weight: bold; color: #111; margin: 12px 0 6px; }}
+      .info {{ text-align: left; background: #FFF9DB; padding: 14px; border-radius: 12px; font-size: 15px; line-height: 1.6; color: #333; margin: 12px 0; }}
+      .btn {{ display: block; color: #fff; text-decoration: none; font-size: 18px; font-weight: bold; padding: 15px; border-radius: 12px; margin-top: 10px; }}
+    </style></head><body>
+    <div class="poster">
+      <div class="badge">🚨 緊急協尋 · 走失毛孩 🚨</div>
+      <div class="name">名字：{safe_pet}</div>
+      {photo_html}
+      <div class="info">
+        <b>📍 最後走失地點：</b>{safe_addr}<br>
+        <b>📝 特徵與狀況：</b>{safe_desc}<br>
+        <b>📞 飼主聯絡電話：</b>{safe_phone}
+      </div>
+      {call_btn}
+      <a class="btn" style="background:#228BE6;" href="https:{S}{S}://google.com{S}?q={urllib.parse.quote(safe_addr)}">🗺️ 開啟走失地點周邊地圖</a>
+    </div></body></html>"""
+    return HTMLResponse(content=html)
 
 @app.get("/call", response_class=HTMLResponse)
 def direct_call_page(num: str, name: str = "飼主緊急電話"):
@@ -127,7 +172,7 @@ def direct_call_page(num: str, name: str = "飼主緊急電話"):
       .btn {{ display: block; background: #12B886; color: #fff; text-decoration: none; font-size: 22px; font-weight: bold; padding: 18px; border-radius: 12px; margin-top: 24px; }}
     </style></head><body>
     <div class="card">
-      <div style="font-size:18px;color:#555;">準備撥打飼主緊急聯絡電話</div>
+      <div style="font-size:18px;color:#555;">準備撥打緊急聯絡電話</div>
       <div style="font-size:28px;font-weight:bold;color:#3D2C2E;margin:10px 0;">{safe_name}</div>
       <div style="font-size:24px;color:#FA5252;font-weight:bold;">{clean_num}</div>
       <a class="btn" href="tel:{clean_num}">📞 立即撥出電話</a>
@@ -190,8 +235,8 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     base = f"https:{S}{S}{host}{S}"
     nav_url = f"{base}?daddr={lat},{lon}&dirflg=w"
     vet_url = f"{base}?q={urllib.parse.quote('24小時急診獸醫院')}&ll={lat},{lon}&z=15"
-    hotel_url = f"{base}?q={urllib.parse.quote('寵物旅館 寵物美容')}&ll={lat},{lon}&z=15"
-    shop_url = f"{base}?q={urllib.parse.quote('寵物用品店')}&ll={lat},{lon}&z=15"
+    hotel_url = f"{base}?q={urllib.parse.quote('動保處 動物之家')}&ll={lat},{lon}&z=15"
+    shop_url = f"{base}?q={urllib.parse.quote('寵物用品店 寵物旅館')}&ll={lat},{lon}&z=15"
 
     html = (PET_MAP_HTML
             .replace("__OFFSET_X__", str(offset_x))
@@ -208,7 +253,7 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     return HTMLResponse(content=html)
 def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
     S = chr(47)
-    base_uid = uid.split("#")[0] if "#" in uid else uid
+    base_uid = uid.split("#") if "#" in uid else uid
     bind_cmd = urllib.parse.quote(f"綁定人員:{base_uid}")
     share_text = urllib.parse.quote(f"邀請您加入「汪喵平安守護 ＆ 寵物照護日記」守護群（不限人數）！點擊下方連結加入後，每次餵食、鏟屎、散步或異常狀況，您都會即時收到通知：\nhttps:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{bind_cmd}")
     share_uri = f"https:{S}{S}line.me{S}R{S}share?text={share_text}"
@@ -217,13 +262,12 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     report_share_txt = urllib.parse.quote(f"🐾【{title}】\n{summary_only}\n\n📲 免費使用「汪喵平安守護」一鍵打卡＋視訊看毛孩：\nhttps:{S}{S}line.me{S}R{S}ti{S}p{S}{LINE_BOT_BASIC_ID}")
     report_share_uri = f"https:{S}{S}line.me{S}R{S}share?text={report_share_txt}"
 
-    note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
     phone_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('飼主電話:')}"
-    pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('毛孩:')}"
+    add_pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('毛孩:')}"
+    rename_pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('改名:')}"
     clean_phone = re.sub(r"[^0-9]", "", str(owner_phone or ""))
 
-    # 1. 智慧健康狀態橫幅 ＋ 今日照護完成度進度條
-    has_alert = ("🚨" in status_text) or ("異常" in status_text)
+    has_alert = ("🚨" in status_text) or ("異常" in status_text) or ("走失" in status_text)
     feed_cnt = status_text.count("餵食：")
     poop_cnt = status_text.count("排泄：")
     act_cnt = status_text.count("活動：") + status_text.count("保健：")
@@ -234,7 +278,7 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     bar_color = "#FA5252" if has_alert else ("#12B886" if pct >= 75 else "#FF922B")
     banner_bg = "#FFF5F5" if has_alert else "#E6FCF5"
     banner_fg = "#C92A2A" if has_alert else "#087F5B"
-    banner_msg = "⚠️ 偵測到健康異常預警，請密切觀察食慾與精神" if has_alert else f"✨ 今日照護任務完成度：{pct}%（狀態穩定）"
+    banner_msg = "⚠️ 偵測到異常或走失警報，請密切留意周邊動態！" if has_alert else f"✨ 今日照護任務完成度：{pct}%（狀態穩定）"
 
     progress_box = BoxComponent(layout="vertical", background_color=banner_bg, corner_radius="10px", padding_all="10px", contents=[
         TextComponent(text=banner_msg, size="xxs", color=banner_fg, weight="bold", wrap=True),
@@ -243,7 +287,6 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
         ])
     ])
 
-    # 2. 四格 KPI 數據儀表板
     kpi_row = BoxComponent(layout="horizontal", spacing="xs", contents=[
         BoxComponent(layout="vertical", background_color="#E6FCF5", corner_radius="10px", padding_all="6px", align_items="center", contents=[
             TextComponent(text="🥣 放飯", size="xxs", color="#0CA678", weight="bold"),
@@ -262,7 +305,6 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
             TextComponent(text=f"{note_cnt}", size="md", color="#5F3DC4", weight="bold")
         ])
     ])
-
     footer_items = [
         TextComponent(text="⚡ 一鍵日常照護打卡", size="xxs", color="#868E96", weight="bold"),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
@@ -277,28 +319,28 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="😿 吃少", text="異常:餵食:今天食慾較差吃得很少，請留意")),
             ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🚨 異常", text="異常:健康:發現軟便或嘔吐狀況，已通知全家"))
         ]),
-        TextComponent(text="📹 遠端互動與一鍵轉傳回報", size="xxs", color="#868E96", weight="bold", margin="md"),
+        TextComponent(text="📹 遠端視訊、特別狀況與轉傳", size="xxs", color="#868E96", weight="bold", margin="md"),
         ButtonComponent(style="primary", color="#7048E8", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩（免下載）", text="開啟視訊")),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 記狀況", uri=note_uri)),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✍️ 記狀況", text="新增狀況")),
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="📤 轉傳交班", uri=report_share_uri))
         ]),
         TextComponent(text="🐾 多隻毛孩與守護群設定", size="xxs", color="#868E96", weight="bold", margin="md"),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="primary", color="#FF6B4A", height="sm", action=MessageAction(label="🐾 切換毛孩", text="切換毛孩")),
-            ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 新增毛孩", uri=pet_uri))
+            ButtonComponent(style="secondary", height="sm", action=URIAction(label="✏️ 改毛孩名", uri=rename_pet_uri))
+        ]),
+        BoxComponent(layout="horizontal", spacing="sm", contents=[
+            ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 新增毛孩", uri=add_pet_uri)),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 邀家人", uri=share_uri)),
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="👥 管人員", text="管理人員"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況")),
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 設鬧鐘", text="餵食時間"))
-        ]),
-        BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 設地址", text="管理地址")),
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🔄 刷新日報", text="今日日報"))
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 設鬧鐘", text="餵食時間")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 設地址", text="管理地址"))
         ])
     ]
 
@@ -316,11 +358,23 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     if lat is not None and lon is not None:
         enc_addr = urllib.parse.quote(clean_addr_only or "毛孩住家")
         map_uri = f"{RENDER_BASE_URL}/pet_map?lat={lat}&lon={lon}&addr={enc_addr}&openExternalBrowser=1"
-        footer_items.append(ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=map_uri)))
+        footer_items.append(
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 急診地圖", uri=map_uri)),
+                ButtonComponent(style="primary", color="#C92A2A", height="sm", action=MessageAction(label="🚨 毛孩走失", text="毛孩走失"))
+            ])
+        )
     elif clean_addr_only and clean_addr_only != "尚未設定":
         host = "maps." + "google.com"
         q_uri = f"https:{S}{S}{host}{S}?q={urllib.parse.quote(clean_addr_only + ' 附近24小時急診獸醫院')}"
-        footer_items.append(ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=q_uri)))
+        footer_items.append(
+            BoxComponent(layout="horizontal", spacing="sm", contents=[
+                ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 急診地圖", uri=q_uri)),
+                ButtonComponent(style="primary", color="#C92A2A", height="sm", action=MessageAction(label="🚨 毛孩走失", text="毛孩走失"))
+            ])
+        )
+    else:
+        footer_items.append(ButtonComponent(style="primary", color="#C92A2A", height="sm", action=MessageAction(label="🚨 毛孩走失緊急協尋通報", text="毛孩走失")))
 
     if NOTION_PET_SHOP_URL.startswith("http"):
         footer_items.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label="🛒 汪喵嚴選好物推薦館", uri=NOTION_PET_SHOP_URL)))
@@ -361,8 +415,8 @@ def on_follow(event):
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
         f"🐾 {active_pet} · 汪喵平安守護已啟動",
-        f"嗨 {uname}！支援多隻毛孩獨立檔案切換：",
-        "點擊下方馬卡龍快捷按鈕（放飯、鏟屎、散步、視訊或新增毛孩），已綁定的家人與飼主都會即時收到通知！",
+        f"嗨 {uname}！支援多隻毛孩獨立檔案與走失協尋：",
+        "點擊下方馬卡龍快捷按鈕（放飯、鏟屎、散步、記狀況或毛孩走失），已綁定的家人與飼主都會即時收到通知！",
         scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="汪喵平安守護已啟動", contents=card))
@@ -378,12 +432,40 @@ def on_location(event):
     st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     o_phone = st.get("owner_phone", "尚未設定")
     card = make_pet_card(
-        f"📍 {active_pet} · 住家與急診獸醫院地圖已開通",
-        "已將此位置設為毛孩的照護座標：",
-        f"🏠 登記位置：{addr}\n🏥 點擊下方紅色地圖按鈕，即可搜尋附近 24小時急診獸醫院！",
+        f"📍 {active_pet} · 住家與協尋定位地圖已開通",
+        "已將此位置設為毛孩的照護與協尋座標：",
+        f"🏠 登記位置：{addr}\n🏥 點擊下方急診地圖或毛孩走失按鈕，可立即搜尋周邊獸醫院或發布協尋海報！",
         scope_uid, lat=lat, lon=lon, addr=addr, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩定位更新成功", contents=card))
+
+@handler.add(MessageEvent, message=ImageMessage)
+def on_image(event):
+    uid = event.source.user_id
+    uname = get_user_name(uid)
+    scope_uid, active_pet, pet_list = get_pet_scope(uid)
+    safe_key = re.sub(r"[^a-zA-Z0-9_-]", "_", scope_uid)
+    try:
+        msg_content = line_bot_api.get_message_content(event.message.id)
+        img_data = b"".join(chunk for chunk in msg_content.iter_content())
+        PET_PHOTO_CACHE[safe_key] = img_data
+    except Exception:
+        pass
+    PENDING_STATE.pop(uid, None)
+    call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": "特別狀況", "detail": "📸 已上傳最新毛孩近照（已同步更新至走失協尋海報檔案）", "is_abnormal": False})
+    st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+    o_phone = st.get("owner_phone", "尚未設定")
+    loc_str = st.get("last_location", "尚未設定")
+    logs = st.get("today_logs", [])
+    logs_txt = "\n".join(logs) if len(logs) > 0 else "📸 已上傳最新毛孩近照"
+    lat, lon = parse_latlon(loc_str)
+    card = make_pet_card(
+        f"📸 {active_pet} · 近照與狀況已更新",
+        f"共 {len(pet_list)} 隻毛孩 ｜ 照片已同步建檔",
+        f"{logs_txt}\n\n🏠 位置：{loc_str}",
+        scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+    )
+    line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩近照已更新", contents=card))
 
 @handler.add(MessageEvent, message=TextMessage)
 def on_text(event):
@@ -435,6 +517,122 @@ def on_text(event):
             ])
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="專屬視訊室已建立", contents=self_card))
+        return
+    # 1. 處理日常一鍵照護打卡（格式：紀錄:類別:詳細內容）
+    if txt.startswith("紀錄:"):
+        PENDING_STATE.pop(uid, None)
+        parts = txt.split(":", 2)
+        _ = parts.pop(0)
+        cat = parts.pop(0) if parts else "照護紀錄"
+        detail = parts.pop(0) if parts else txt
+        res = call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": False})
+        t_str = res.get("time", "剛剛")
+        f_cnt = res.get("family_count", 0)
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        o_phone = st.get("owner_phone", "尚未設定")
+        loc_str = st.get("last_location", "尚未設定")
+        logs = st.get("today_logs", [])
+        logs_txt = "\n".join(logs) if len(logs) > 0 else f"[{t_str}] {cat}：{detail}"
+        lat, lon = parse_latlon(loc_str)
+
+        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母"
+        card = make_pet_card(
+            f"✅ {active_pet} · {cat}已紀錄",
+            f"時間：{t_str}　｜　{notify_note}",
+            f"{logs_txt}\n\n🏠 位置：{loc_str}",
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"{active_pet} {cat}紀錄完成", contents=card))
+        return
+
+    # 1-1. 處理異常健康狀況預警（格式：異常:類別:詳細內容）
+    if txt.startswith("異常:"):
+        PENDING_STATE.pop(uid, None)
+        parts = txt.split(":", 2)
+        _ = parts.pop(0)
+        cat = parts.pop(0) if parts else "健康異常"
+        detail = parts.pop(0) if parts else txt
+        res = call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": True})
+        t_str = res.get("time", "剛剛")
+        f_cnt = res.get("family_count", 0)
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        o_phone = st.get("owner_phone", "尚未設定")
+        loc_str = st.get("last_location", "尚未設定")
+        logs = st.get("today_logs", [])
+        logs_txt = "\n".join(logs) if len(logs) > 0 else f"[{t_str}] 🚨 {cat}：{detail}"
+        lat, lon = parse_latlon(loc_str)
+
+        card = make_pet_card(
+            f"🚨 {active_pet} · 異常狀況通報",
+            f"時間：{t_str}　｜　已警報通知 {f_cnt} 位守護成員",
+            f"{logs_txt}\n\n🏠 位置：{loc_str}",
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"{active_pet} 異常狀況通報", contents=card))
+        return
+
+    # 1-2. 新增其他特別狀況（支援直接打字、傳照片或帶前綴輸入）
+    if txt in ["新增狀況", "新增特別狀況", "記狀況"]:
+        PENDING_STATE[uid] = "WAITING_NOTE"
+        S = chr(47)
+        note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
+        guide_card = BubbleContainer(
+            size="mega",
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
+                TextComponent(text=f"✍️ 新增「{active_pet}」特別狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
+            ]),
+            body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                TextComponent(text="✅ 請直接在下方對話框打字輸入狀況內容（不需加任何前綴，直接傳送即可），或直接傳一張毛孩照片！", size="xs", color="#3D2C2E", wrap=True),
+                TextComponent(text="💡 範例：今天在陽台曬太陽睡著了，精神很好", size="xxs", color="#888888", wrap=True)
+            ]),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#FD7E14", height="sm", action=URIAction(label="✍️ 帶入「狀況:」快速輸入", uri=note_uri)),
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="❌ 取消並返回日報", text="取消輸入"))
+            ])
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="新增毛孩特別狀況", contents=guide_card))
+        return
+
+    if txt == "取消輸入":
+        PENDING_STATE.pop(uid, None)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="👌 已取消輸入！輸入「今日日報」可返回主畫面。"))
+        return
+
+    is_prefixed_note = txt.startswith("狀況:") or txt.startswith("狀況：") or txt.startswith("備忘:") or txt.startswith("備忘：")
+    known_cmds = [
+        "今日日報", "修改狀況", "刪除狀況", "修改紀錄", "編輯狀況",
+        "餵食時間", "放飯時間", "鬧鐘設定", "管理飼主電話", "修改飼主電話", "飼主電話",
+        "刪除飼主電話", "清除飼主電話", "管理地址", "住家地址", "修改地址", "地址",
+        "刪除地址", "清除地址", "管理人員", "人員名單", "修改人員", "刪除人員",
+        "清空人員", "全部移除人員", "切換毛孩", "多隻毛孩", "毛孩名單", "管理毛孩",
+        "毛孩走失", "走失協尋", "走失", "解除走失"
+    ]
+    is_pending_note = (PENDING_STATE.get(uid) == "WAITING_NOTE") and (txt not in known_cmds) and (":" not in txt[:4])
+
+    if is_prefixed_note or is_pending_note:
+        PENDING_STATE.pop(uid, None)
+        note_content = txt[3:].strip() if is_prefixed_note else txt
+        if not note_content:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✍️ 請輸入毛孩的特別狀況內容喔！"))
+            return
+        res = call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": "特別狀況", "detail": note_content, "is_abnormal": False})
+        t_str = res.get("time", "剛剛")
+        f_cnt = res.get("family_count", 0)
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        o_phone = st.get("owner_phone", "尚未設定")
+        loc_str = st.get("last_location", "尚未設定")
+        logs = st.get("today_logs", [])
+        logs_txt = "\n".join(logs) if len(logs) > 0 else f"[{t_str}] 特別狀況：{note_content}"
+        lat, lon = parse_latlon(loc_str)
+
+        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母"
+        card = make_pet_card(
+            f"✍️ {active_pet} · 特別狀況已更新",
+            f"時間：{t_str}　｜　{notify_note}",
+            f"{logs_txt}\n\n🏠 位置：{loc_str}",
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="特別狀況已更新", contents=card))
         return
     # 2. 修改／刪除今日已記錄的照護狀況（支援文字覆蓋修改與單筆刪除）
     if txt in ["修改狀況", "刪除狀況", "修改紀錄", "編輯狀況"]:
@@ -584,7 +782,7 @@ def on_text(event):
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急直撥電話已設定", contents=card))
         return
-    # 5. 住家／寄宿地址設定、修改與刪除
+    # 5. 住家／寄宿／走失地點設定、修改與刪除
     if txt in ["管理地址", "住家地址", "修改地址", "地址"]:
         S = chr(47)
         edit_addr_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('地址:')}"
@@ -624,7 +822,7 @@ def on_text(event):
         card = make_pet_card(
             "🏠 毛孩住家／寄宿地址已更新",
             f"登記地址：{new_loc}",
-            "現在點擊下方紅色地圖按鈕，即可直接搜尋附近 24小時急診獸醫院與寵物旅館！",
+            "現在點擊下方急診地圖或毛孩走失按鈕，即可直接搜尋周邊獸醫院或發布協尋海報！",
             scope_uid, lat=lat, lon=lon, addr=new_loc, owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址已更新", contents=card))
@@ -655,7 +853,7 @@ def on_text(event):
 
         body_contents = [
             TextComponent(text=f"目前已綁定守護人員：{len(f_ids)} 位（不限人數上限）", size="sm", weight="bold", color="#3D2C2E"),
-            TextComponent(text="照護打卡與視訊邀請會同步發送給以下所有成員。如需移除特定家人／保母，請直接點擊下方移除按鈕：", size="xs", color="#666666", wrap=True)
+            TextComponent(text="照護打卡與走失警報會同步發送給以下所有成員。如需移除特定家人／保母，請直接點擊下方移除按鈕：", size="xs", color="#666666", wrap=True)
         ]
         footer_btns = []
 
@@ -697,13 +895,87 @@ def on_text(event):
         call_sheet({"action": "clear_family", "user_id": uid})
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🗑️ 已為您清空所有家人／保母人員名單！隨時可透過邀請連結重新加入。"))
         return
-    # 7. 多隻毛孩獨立檔案管理：切換毛孩、新增毛孩、刪除毛孩與綁定人員
+
+    # 7. 更改目前毛孩名字（保留原紀錄）
+    if txt.startswith("改名:") or txt.startswith("改名："):
+        new_name = txt[3:].strip()
+        if not new_name:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 請在「改名:」後面輸入新的毛孩名字喔！例如：改名:橘子"))
+            return
+        old_name = active_pet
+        if old_name in pet_list:
+            idx = pet_list.index(old_name)
+            pet_list[idx] = new_name
+        else:
+            pet_list.append(new_name)
+        PET_LIST_MAP[uid] = pet_list
+        ACTIVE_PET_MAP[uid] = new_name
+        call_sheet({"action": "set_pet", "user_id": scope_uid, "user_name": uname, "pet_name": new_name})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        o_phone = st.get("owner_phone", "尚未設定")
+        loc_str = st.get("last_location", "尚未設定")
+        logs = st.get("today_logs", [])
+        logs_txt = "\n".join(logs) if len(logs) > 0 else f"已將「{old_name}」更名為「{new_name}」（原紀錄完整保留）"
+        lat, lon = parse_latlon(loc_str)
+        card = make_pet_card(
+            f"✏️ 已更名為「{new_name}」",
+            f"原本名字：{old_name}（所有照護紀錄已完整保留）",
+            f"{logs_txt}\n\n🏠 位置：{loc_str}",
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"毛孩已更名為 {new_name}", contents=card))
+        return
+    # 8. 毛孩走失緊急協尋系統（生成網頁版尋寵海報 ＋ 一鍵轉傳全網協尋 ＋ 推播守護群）
+    if txt in ["毛孩走失", "走失協尋", "走失"]:
+        S = chr(47)
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        o_phone = st.get("owner_phone", "尚未設定")
+        loc_str = st.get("last_location", "尚未設定")
+        clean_addr = next(iter(str(loc_str).split("("))).strip() if "(" in str(loc_str) else str(loc_str).strip()
+        if not clean_addr or clean_addr == "尚未設定":
+            clean_addr = "新北市五股區周邊（請飼主更新定位）"
+
+        safe_key = re.sub(r"[^a-zA-Z0-9_-]", "_", scope_uid)
+        call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": "健康異常", "detail": f"🚨【緊急走失協尋】「{active_pet}」於 {clean_addr} 走失，請全體成員協助留意！", "is_abnormal": True})
+
+        poster_uri = f"{RENDER_BASE_URL}/lost_poster?scope_key={safe_key}&pet={urllib.parse.quote(active_pet)}&addr={urllib.parse.quote(clean_addr)}&phone={urllib.parse.quote(o_phone)}&openExternalBrowser=1"
+        share_lost_txt = urllib.parse.quote(f"🚨【緊急協尋走失毛孩：{active_pet}】🚨\n📍 走失地點：{clean_addr}\n📞 飼主聯絡電話：{o_phone}\n\n請大家幫忙留意轉發！查看毛孩照片與即時協尋海報：\n{poster_uri}")
+        share_lost_uri = f"https:{S}{S}line.me{S}R{S}share?text={share_lost_txt}"
+
+        lost_card = BubbleContainer(
+            size="mega",
+            header=BoxComponent(layout="vertical", background_color="#C92A2A", padding_all="14px", contents=[
+                TextComponent(text=f"🚨 緊急協尋走失毛孩：{active_pet}", weight="bold", size="md", color="#FFFFFF", wrap=True),
+                TextComponent(text="已同步通報全體守護群成員", size="xs", color="#FFE3E3", weight="bold", wrap=True, margin="xs")
+            ]),
+            body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFF5F5", contents=[
+                TextComponent(text=f"📍 最後走失地點：{clean_addr}", size="xs", color="#111111", weight="bold", wrap=True),
+                TextComponent(text=f"📞 飼主緊急電話：{o_phone}", size="xs", color="#111111", weight="bold", wrap=True),
+                TextComponent(text="💡 提示：直接傳一張毛孩照片給機器人，協尋海報網頁會立刻自動放上毛孩照片！", size="xxs", color="#C92A2A", wrap=True, margin="sm")
+            ]),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFF5F5", contents=[
+                ButtonComponent(style="primary", color="#C92A2A", height="sm", action=URIAction(label="🖼️ 開啟專屬尋寵協尋海報網頁", uri=poster_uri)),
+                ButtonComponent(style="primary", color="#FD7E14", height="sm", action=URIAction(label="📤 一鍵轉傳尋寵警報到群組", uri=share_lost_uri)),
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🎉 已尋獲平安回家（解除警報）", text="解除走失")),
+                ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報"))
+            ])
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"🚨 緊急協尋走失毛孩：{active_pet}", contents=lost_card))
+        return
+
+    if txt == "解除走失":
+        call_sheet({"action": "log_care", "user_id": scope_uid, "user_name": uname, "category": "特別狀況", "detail": f"🎉 好消息！「{active_pet}」已平安尋獲回家，解除走失協尋警報！", "is_abnormal": False})
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🎉 太棒了！已為「{active_pet}」記錄平安尋獲並解除警報！輸入「今日日報」可返回主畫面。"))
+        return
+
+    # 9. 多隻毛孩獨立檔案管理：切換毛孩、新增毛孩、刪除毛孩與綁定人員
     if txt in ["切換毛孩", "多隻毛孩", "毛孩名單", "管理毛孩"]:
         S = chr(47)
         add_pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('毛孩:')}"
+        rename_pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('改名:')}"
         body_items = [
             TextComponent(text=f"目前正在管理：【{active_pet}】", size="sm", weight="bold", color="#FF6B4A", wrap=True),
-            TextComponent(text="每隻毛孩皆擁有獨立的放飯、鏟屎、散步統計與紀錄表，互不干擾。請點擊下方按鈕一鍵切換對象：", size="xs", color="#666666", wrap=True)
+            TextComponent(text="每隻毛孩皆擁有獨立的照護統計與走失檔案，互不干擾：", size="xs", color="#666666", wrap=True)
         ]
         footer_btns = []
         for p_item in pet_list:
@@ -721,18 +993,19 @@ def on_text(event):
                     ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除毛孩檔案：{p_item}"[:38], text=f"刪毛孩:{p_item}"))
                 )
 
+        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label=f"✏️ 更改「{active_pet}」的名字"[:38], uri=rename_pet_uri)))
         footer_btns.append(ButtonComponent(style="primary", color="#228BE6", height="sm", action=URIAction(label="➕ 新增另一隻毛孩檔案", uri=add_pet_uri)))
         footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報")))
 
         switch_card = BubbleContainer(
             size="mega",
             header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
-                TextComponent(text=f"🐾 多隻毛孩檔案切換（共 {len(pet_list)} 隻）", weight="bold", size="md", color="#FFFFFF", wrap=True)
+                TextComponent(text=f"🐾 多隻毛孩檔案管理（共 {len(pet_list)} 隻）", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
             body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=body_items),
             footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_btns)
         )
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="多隻毛孩檔案切換", contents=switch_card))
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="多隻毛孩檔案管理", contents=switch_card))
         return
 
     if txt.startswith("切換至:"):
@@ -786,7 +1059,7 @@ def on_text(event):
             card = make_pet_card(
                 f"🐾 {p_val} · 專屬毛孩檔案已建立",
                 f"目前共有 {len(pet_list)} 隻毛孩 ｜ 鬧鐘：{c_times}",
-                f"已為「{p_val}」開啟獨立照護儀表板！所有放飯、鏟屎、散步統計都會獨立計算，點「🐾 切換毛孩」可隨時切換其他寶貝。\n\n🏠 位置：{loc_str}",
+                f"已為「{p_val}」開啟獨立照護儀表板！所有放飯、鏟屎、散步統計都會獨立計算。\n\n🏠 位置：{loc_str}",
                 scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
             )
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"已新增毛孩 {p_val}", contents=card))
@@ -803,7 +1076,7 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 8. 查看今日寵物照護日報（旗艦 5.0 多寵獨立檔案版）
+    # 10. 查看今日寵物照護日報（旗艦 6.0 終極完美版）
     st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     f_cnt = st.get("family_count", 0)
     o_phone = st.get("owner_phone", "尚未設定")
