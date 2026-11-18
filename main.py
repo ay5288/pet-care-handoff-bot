@@ -198,8 +198,28 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     phone_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('飼主電話:')}"
     clean_phone = re.sub(r"[^0-9]", "", str(owner_phone or ""))
 
+    # 自動統計今日各項照護次數（顯示在頂部 KPI 數據小卡）
+    feed_cnt = status_text.count("餵食：")
+    poop_cnt = status_text.count("排泄：")
+    act_cnt = status_text.count("活動：") + status_text.count("保健：")
+
+    kpi_row = BoxComponent(layout="horizontal", spacing="sm", contents=[
+        BoxComponent(layout="vertical", background_color="#E6FCF5", corner_radius="10px", padding_all="8px", align_items="center", contents=[
+            TextComponent(text="🥣 放飯", size="xxs", color="#0CA678", weight="bold"),
+            TextComponent(text=f"{feed_cnt} 次", size="md", color="#087F5B", weight="bold", margin="xs")
+        ]),
+        BoxComponent(layout="vertical", background_color="#E7F5FF", corner_radius="10px", padding_all="8px", align_items="center", contents=[
+            TextComponent(text="💩 鏟屎", size="xxs", color="#1C7ED6", weight="bold"),
+            TextComponent(text=f"{poop_cnt} 次", size="md", color="#1864AB", weight="bold", margin="xs")
+        ]),
+        BoxComponent(layout="vertical", background_color="#FFF4E6", corner_radius="10px", padding_all="8px", align_items="center", contents=[
+            TextComponent(text="🐕 散步保健", size="xxs", color="#F76707", weight="bold"),
+            TextComponent(text=f"{act_cnt} 次", size="md", color="#D9480F", weight="bold", margin="xs")
+        ])
+    ])
+
     footer_items = [
-        # 1. 馬卡龍繽紛六宮格快捷打卡（2字精準標籤，所有手機螢幕 100% 完整顯示）
+        TextComponent(text="⚡ 一鍵日常照護打卡", size="xxs", color="#868E96", weight="bold"),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="primary", color="#20C997", height="sm", action=MessageAction(label="🥣 放飯", text="紀錄:餵食:乾乾／罐罐已吃完，飲水正常")),
             ButtonComponent(style="primary", color="#339AF0", height="sm", action=MessageAction(label="💩 鏟屎", text="紀錄:排泄:已清理貓砂／撿便，大小便正常"))
@@ -212,13 +232,13 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="😿 吃少", text="異常:餵食:今天食慾較差吃得很少，請留意")),
             ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🚨 異常", text="異常:健康:發現軟便或嘔吐狀況，已通知全家"))
         ]),
-        # 2. 視訊與特別狀況管理
-        ButtonComponent(style="primary", color="#7950F2", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩", text="開啟視訊")),
+        TextComponent(text="📹 遠端互動與狀況筆記", size="xxs", color="#868E96", weight="bold", margin="md"),
+        ButtonComponent(style="primary", color="#7950F2", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩（免下載）", text="開啟視訊")),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 記狀況", uri=note_uri)),
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況"))
         ]),
-        # 3. 人員與鬧鐘管理
+        TextComponent(text="⚙️ 守護群與緊急設定", size="xxs", color="#868E96", weight="bold", margin="md"),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 邀家人", uri=share_uri)),
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="👥 管人員", text="管理人員"))
@@ -229,7 +249,6 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
         ])
     ]
 
-    # 4. 飼主緊急電話（已設定時顯示直撥＋管理雙按鈕）
     if len(clean_phone) >= 8:
         footer_items.append(
             BoxComponent(layout="horizontal", spacing="sm", contents=[
@@ -240,7 +259,6 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     else:
         footer_items.append(ButtonComponent(style="secondary", height="sm", action=URIAction(label="📞 設定飼主緊急電話", uri=phone_uri)))
 
-    # 5. 附近 24H 急診獸醫院地圖
     clean_addr_only = next(iter(str(addr).split("("))).strip() if "(" in str(addr) else str(addr).strip()
     if lat is not None and lon is not None:
         enc_addr = urllib.parse.quote(clean_addr_only or "毛孩住家")
@@ -258,6 +276,7 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
             TextComponent(text=subtitle, size="xs", color="#FFF4E6", weight="bold", wrap=True, margin="xs")
         ]),
         body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
+            kpi_row,
             BoxComponent(layout="vertical", background_color="#FFF4E6", corner_radius="12px", padding_all="12px", contents=[
                 TextComponent(text=status_text, size="xs", color="#3D2C2E", wrap=True)
             ])
@@ -730,7 +749,7 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 8. 查看今日寵物照護日報（時尚活潑單一主畫面）
+    # 8. 查看今日寵物照護日報（旗艦 2.0 KPI 數據儀表板）
     st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
     p_name = st.get("pet_name", "毛孩寶貝")
     f_cnt = st.get("family_count", 0)
