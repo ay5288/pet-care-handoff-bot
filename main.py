@@ -14,11 +14,11 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 
 # ⚠️ 1. 請填入「汪喵寵物照護資料庫」的 Google Apps Script /exec 網址
-GOOGLE_SHEET_API = "https://google.com"
+GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbyXqSsQ5exQq4T-i4t4DzCwMIX15fo_NB3J66Ixodax5ktO0WT7MobhRDKoOwLJN4j8ZQ/exec"
 # ⚠️ 2. 請填入寵物機器人的 LINE 官方帳號 ID（包含 @ 符號，例如 @123abcde）
-LINE_BOT_BASIC_ID = "@請填入寵物機器人的官方帳號ID"
+LINE_BOT_BASIC_ID = "@650tsvlz"
 # ⚠️ 3. 請確認這個寵物機器人的 Render 公開網址（結尾不要加斜線）
-RENDER_BASE_URL = "https://onrender.com"
+RENDER_BASE_URL = "https://pet-care-handoff-bot.onrender.com"
 # ⚠️ 4. 可填入您的 Notion 寵物嚴選好物變現頁面網址（未填時自動隱藏購物按鈕）
 NOTION_PET_SHOP_URL = ""
 
