@@ -600,34 +600,32 @@ def on_text(event):
         return
 
     # 0-1. 相簿與大頭貼管理中心（不限張數、設為頭貼、替換修改照片、刪除照片）
+        # 0-1. 相簿與大頭貼管理中心（不限張數、設為頭貼、替換修改照片、刪除照片）
     if txt in ["管理相簿", "相簿", "設頭貼", "毛孩相簿"]:
         gal = PET_GALLERY_CACHE.get(safe_key, [])
         cur_avatar = PET_AVATAR_MAP.get(safe_key, "")
         gallery_uri = f"{RENDER_BASE_URL}/pet_gallery?scope_key={safe_key}&pet={urllib.parse.quote(active_pet)}&openExternalBrowser=1"
         body_items = [
             TextComponent(text=f"目前相簿共有 {len(gal)} 張照片（不限張數上限）", size="sm", weight="bold", color="#3D2C2E", wrap=True),
-            TextComponent(text="直接傳送照片給機器人即可無限新增！在下方可選任一張設為卡片最上方大頭貼，或替換／刪除舊照片：", size="xs", color="#666666", wrap=True)
+            TextComponent(text="點左下角「📷 / 🖼️」傳送照片即可無限新增！在下方可選任一張設為卡片最上方大頭貼，或替換／刪除舊照片：", size="xs", color="#666666", wrap=True)
         ]
         footer_btns = [
-            ButtonComponent(style="primary", color="#7048E8", height="sm", action=URIAction(label=f"🌐 開啟完整相簿網頁（共 {len(gal)} 張）", uri=gallery_uri))
+            ButtonComponent(style="primary", color="#7048E8", height="sm", action=URIAction(label="🌐 開啟完整相簿網頁", uri=gallery_uri))
         ]
         if len(gal) > 0:
-            for idx, item in enumerate(gal[-5:], max(1, len(gal) - 4)):
+            start_no = max(1, len(gal) - 3)
+            for idx, item in enumerate(gal[-4:], start_no):
                 pid = item.get("id", "")
-                ts = item.get("time", "")
+                ts = str(item.get("time", ""))[:11]
                 is_av = (pid == cur_avatar)
-                footer_btns.append(
-                    ButtonComponent(
-                        style="primary" if is_av else "secondary",
-                        color="#12B886" if is_av else None,
-                        height="sm",
-                        action=MessageAction(label=f"{'⭐ 目前頭貼' if is_av else '⭐ 設為頭貼'} #{idx} ({ts})"[:38], text=f"設頭貼:{pid}")
-                    )
-                )
+                if is_av:
+                    footer_btns.append(ButtonComponent(style="primary", color="#12B886", height="sm", action=MessageAction(label=f"⭐ 目前頭貼 #{idx} ({ts})"[:20], text=f"設頭貼:{pid}")))
+                else:
+                    footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"⭐ 設頭貼 #{idx} ({ts})"[:20], text=f"設頭貼:{pid}")))
                 footer_btns.append(
                     BoxComponent(layout="horizontal", spacing="sm", contents=[
-                        ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🔄 替換 #{idx}"[:18], text=f"改照片:{pid}")),
-                        ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除 #{idx}"[:18], text=f"刪照片:{pid}"))
+                        ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🔄 替換 #{idx}", text=f"改照片:{pid}")),
+                        ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除 #{idx}", text=f"刪照片:{pid}"))
                     ])
                 )
         footer_btns.append(ButtonComponent(style="primary", color="#FF6B4A", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報")))
@@ -641,6 +639,7 @@ def on_text(event):
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩相簿與頭貼管理", contents=gal_card))
         return
+
 
     if txt.startswith("設頭貼:"):
         target_pid = txt[4:].strip()
