@@ -20,6 +20,7 @@ LINE_BOT_BASIC_ID = "@650tsvlz"
 # ⚠️ 3. 請確認這個寵物機器人的 Render 公開網址（結尾不要加斜線）
 RENDER_BASE_URL = "https://pet-care-handoff-bot.onrender.com"
 
+
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
@@ -28,21 +29,21 @@ PET_MAP_HTML = """<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>汪喵居家守護與周邊急診獸醫院地圖</title>
 <style>
-  body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #f2f4f8; }
-  .header { background: #2C3E50; color: #fff; padding: 12px 16px; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-  .map-viewport { width: 100%; height: 300px; overflow: hidden; position: relative; background: #e2e8f0; border-bottom: 2px solid #cbd5e1; }
+  body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #FFFDF9; }
+  .header { background: #FF6B4A; color: #fff; padding: 12px 16px; font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+  .map-viewport { width: 100%; height: 300px; overflow: hidden; position: relative; background: #FFF4E6; border-bottom: 2px solid #FFE8D6; }
   .map-canvas { width: 768px; height: 768px; position: absolute; left: 50%; top: 50%; transform: translate(__OFFSET_X__px, __OFFSET_Y__px); }
   .tile-grid { display: grid; grid-template-columns: repeat(3, 256px); grid-template-rows: repeat(3, 256px); width: 768px; height: 768px; }
   .tile-grid img { width: 256px; height: 256px; display: block; }
   .overlay-svg { position: absolute; top: 0; left: 0; width: 768px; height: 768px; pointer-events: none; }
   .box { padding: 14px; max-width: 600px; margin: 0 auto; }
-  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .title { font-weight: bold; font-size: 16px; color: #111; margin-bottom: 6px; }
-  .meta { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; }
-  .btn { display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; padding: 13px; border-radius: 10px; font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 10px; }
-  .btn-red { background: #FF3B30; }
-  .btn-green { background: #1DB446; }
-  .btn-blue { background: #007AFF; }
+  .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 3px 10px rgba(255,107,74,0.1); }
+  .title { font-weight: bold; font-size: 16px; color: #3D2C2E; margin-bottom: 6px; }
+  .meta { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 12px; }
+  .btn { display: block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; padding: 13px; border-radius: 12px; font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 10px; }
+  .btn-red { background: #FA5252; }
+  .btn-green { background: #20C997; }
+  .btn-blue { background: #339AF0; }
 </style>
 </head><body>
 <div class="header"><span>🐾 汪喵居家與急診獸醫院地圖</span><span style="font-size:12px;">方圓 1km 守護圈</span></div>
@@ -104,14 +105,14 @@ def direct_call_page(num: str, name: str = "飼主緊急電話"):
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>正在撥打給 {safe_name}</title>
     <style>
-      body {{ font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #f2f4f8; }}
-      .card {{ background: #fff; border-radius: 16px; padding: 30px 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
-      .btn {{ display: block; background: #1DB446; color: #fff; text-decoration: none; font-size: 22px; font-weight: bold; padding: 18px; border-radius: 12px; margin-top: 24px; }}
+      body {{ font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #FFFDF9; }}
+      .card {{ background: #fff; border-radius: 16px; padding: 30px 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 12px rgba(255,107,74,0.12); }}
+      .btn {{ display: block; background: #20C997; color: #fff; text-decoration: none; font-size: 22px; font-weight: bold; padding: 18px; border-radius: 12px; margin-top: 24px; }}
     </style></head><body>
     <div class="card">
       <div style="font-size:18px;color:#555;">準備撥打飼主緊急聯絡電話</div>
-      <div style="font-size:28px;font-weight:bold;color:#111;margin:10px 0;">{safe_name}</div>
-      <div style="font-size:24px;color:#FF3B30;font-weight:bold;">{clean_num}</div>
+      <div style="font-size:28px;font-weight:bold;color:#3D2C2E;margin:10px 0;">{safe_name}</div>
+      <div style="font-size:24px;color:#FA5252;font-weight:bold;">{clean_num}</div>
       <a class="btn" href="tel:{clean_num}">📞 立即撥出電話</a>
     </div>
     <script>window.onload = function() {{ window.location.href = "tel:{clean_num}"; }};</script>
@@ -128,13 +129,13 @@ def video_call_page(room: str, pet: str = "毛孩寶貝"):
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>{safe_pet} · 專屬視訊看毛孩室</title>
     <style>
-      body {{ font-family: -apple-system, sans-serif; text-align: center; padding: 36px 20px; background: #f2f4f8; }}
-      .card {{ background: #fff; border-radius: 16px; padding: 28px 20px; max-width: 420px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
-      .btn {{ display: block; background: #5856D6; color: #fff; text-decoration: none; font-size: 20px; font-weight: bold; padding: 18px; border-radius: 12px; margin-top: 22px; }}
+      body {{ font-family: -apple-system, sans-serif; text-align: center; padding: 36px 20px; background: #FFFDF9; }}
+      .card {{ background: #fff; border-radius: 16px; padding: 28px 20px; max-width: 420px; margin: 0 auto; box-shadow: 0 4px 12px rgba(121,80,242,0.12); }}
+      .btn {{ display: block; background: #7950F2; color: #fff; text-decoration: none; font-size: 20px; font-weight: bold; padding: 18px; border-radius: 12px; margin-top: 22px; }}
     </style></head><body>
     <div class="card">
       <div style="font-size:16px;color:#555;">📹 汪喵遠端視訊看毛孩（免下載 App）</div>
-      <div style="font-size:26px;font-weight:bold;color:#111;margin:12px 0;">{safe_pet} 的專屬視訊室</div>
+      <div style="font-size:26px;font-weight:bold;color:#3D2C2E;margin:12px 0;">{safe_pet} 的專屬視訊室</div>
       <div style="font-size:13px;color:#666;line-height:1.5;">正在為您開啟高清視訊通話，請允許瀏覽器使用「麥克風與相機」權限：</div>
       <a class="btn" href="{jitsi_url}">📹 立即進入視訊通話</a>
     </div>
@@ -164,8 +165,8 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     radius_px = round(1000.0 / meters_per_px, 1)
 
     svg_marks = [
-        f'<circle cx="{user_px}" cy="{user_py}" r="{radius_px}" fill="#FF9500" fill-opacity="0.14" stroke="#FF9500" stroke-width="2" stroke-dasharray="6,4"/>',
-        f'<circle cx="{user_px}" cy="{user_py}" r="10" fill="#FF9500" stroke="#fff" stroke-width="3"/>'
+        f'<circle cx="{user_px}" cy="{user_py}" r="{radius_px}" fill="#FF6B4A" fill-opacity="0.14" stroke="#FF6B4A" stroke-width="2" stroke-dasharray="6,4"/>',
+        f'<circle cx="{user_px}" cy="{user_py}" r="10" fill="#FF6B4A" stroke="#fff" stroke-width="3"/>'
     ]
     safe_addr = addr.replace("<", "").replace(">", "")
     host = "maps." + "google.com"
@@ -198,21 +199,21 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     clean_phone = re.sub(r"[^0-9]", "", str(owner_phone or ""))
 
     footer_items = [
-        # 1. 六宮格精簡快捷打卡（2字標籤，所有手機螢幕 100% 完整顯示不出現 ...）
+        # 1. 馬卡龍繽紛六宮格快捷打卡（2字精準標籤，所有手機螢幕 100% 完整顯示）
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="primary", color="#1DB446", height="sm", action=MessageAction(label="🥣 放飯", text="紀錄:餵食:乾乾／罐罐已吃完，飲水正常")),
-            ButtonComponent(style="primary", color="#007AFF", height="sm", action=MessageAction(label="💩 鏟屎", text="紀錄:排泄:已清理貓砂／撿便，大小便正常"))
+            ButtonComponent(style="primary", color="#20C997", height="sm", action=MessageAction(label="🥣 放飯", text="紀錄:餵食:乾乾／罐罐已吃完，飲水正常")),
+            ButtonComponent(style="primary", color="#339AF0", height="sm", action=MessageAction(label="💩 鏟屎", text="紀錄:排泄:已清理貓砂／撿便，大小便正常"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="primary", color="#FF9500", height="sm", action=MessageAction(label="🐕 散步", text="紀錄:活動:已完成外出散步與陪玩運動")),
-            ButtonComponent(style="primary", color="#5856D6", height="sm", action=MessageAction(label="💊 保健", text="紀錄:保健:已按時餵食驅蟲藥／保健品"))
+            ButtonComponent(style="primary", color="#FF922B", height="sm", action=MessageAction(label="🐕 散步", text="紀錄:活動:已完成外出散步與陪玩運動")),
+            ButtonComponent(style="primary", color="#845EF7", height="sm", action=MessageAction(label="💊 保健", text="紀錄:保健:已按時餵食驅蟲藥／保健品"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="😿 吃少", text="異常:餵食:今天食慾較差吃得很少，請留意")),
-            ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🚨 異常", text="異常:健康:發現軟便或嘔吐狀況，已通知全家"))
+            ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🚨 異常", text="異常:健康:發現軟便或嘔吐狀況，已通知全家"))
         ]),
         # 2. 視訊與特別狀況管理
-        ButtonComponent(style="primary", color="#5856D6", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩", text="開啟視訊")),
+        ButtonComponent(style="primary", color="#7950F2", height="sm", action=MessageAction(label="📹 一鍵視訊看毛孩", text="開啟視訊")),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 記狀況", uri=note_uri)),
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況"))
@@ -232,7 +233,7 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     if len(clean_phone) >= 8:
         footer_items.append(
             BoxComponent(layout="horizontal", spacing="sm", contents=[
-                ButtonComponent(style="primary", color="#FF9500", height="sm", action=URIAction(label=f"📞 {clean_phone}", uri=f"{RENDER_BASE_URL}/call?num={clean_phone}&name={urllib.parse.quote('毛孩飼主緊急聯絡人')}&openExternalBrowser=1")),
+                ButtonComponent(style="primary", color="#FF922B", height="sm", action=URIAction(label=f"📞 {clean_phone}", uri=f"{RENDER_BASE_URL}/call?num={clean_phone}&name={urllib.parse.quote('毛孩飼主緊急聯絡人')}&openExternalBrowser=1")),
                 ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改電話", text="管理飼主電話"))
             ])
         )
@@ -244,24 +245,24 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     if lat is not None and lon is not None:
         enc_addr = urllib.parse.quote(clean_addr_only or "毛孩住家")
         map_uri = f"{RENDER_BASE_URL}/pet_map?lat={lat}&lon={lon}&addr={enc_addr}&openExternalBrowser=1"
-        footer_items.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=map_uri)))
+        footer_items.append(ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=map_uri)))
     elif clean_addr_only and clean_addr_only != "尚未設定":
         host = "maps." + "google.com"
         q_uri = f"https:{S}{S}{host}{S}?q={urllib.parse.quote(clean_addr_only + ' 附近24小時急診獸醫院')}"
-        footer_items.append(ButtonComponent(style="primary", color="#FF3B30", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=q_uri)))
+        footer_items.append(ButtonComponent(style="primary", color="#FA5252", height="sm", action=URIAction(label="🏥 附近 24H 急診獸醫院地圖", uri=q_uri)))
 
     return BubbleContainer(
         size="mega",
-        header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+        header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
             TextComponent(text=title, weight="bold", size="md", color="#FFFFFF", wrap=True),
-            TextComponent(text=subtitle, size="xs", color="#F39C12", weight="bold", wrap=True, margin="xs")
+            TextComponent(text=subtitle, size="xs", color="#FFF4E6", weight="bold", wrap=True, margin="xs")
         ]),
-        body=BoxComponent(layout="vertical", spacing="md", contents=[
-            BoxComponent(layout="vertical", background_color="#F8F9FA", corner_radius="10px", padding_all="12px", contents=[
-                TextComponent(text=status_text, size="xs", color="#222222", wrap=True)
+        body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
+            BoxComponent(layout="vertical", background_color="#FFF4E6", corner_radius="12px", padding_all="12px", contents=[
+                TextComponent(text=status_text, size="xs", color="#3D2C2E", wrap=True)
             ])
         ]),
-        footer=BoxComponent(layout="vertical", spacing="sm", contents=footer_items)
+        footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_items)
     )
 @app.post("/callback")
 async def callback(request: Request):
@@ -283,8 +284,8 @@ def on_follow(event):
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
         "🐾 汪喵平安守護 ＆ 照護日記 · 已啟動",
-        f"嗨 {uname}！歡迎使用毛孩交班守護 App：",
-        "點擊下方快捷按鈕（放飯、鏟屎、散步、視訊或記狀況），已綁定的家人與飼主都會即時收到通知！",
+        f"嗨 {uname}！歡迎開啟毛孩快樂守護日常：",
+        "點擊下方馬卡龍快捷按鈕（放飯、鏟屎、散步、視訊或記狀況），已綁定的家人與飼主都會即時收到通知！",
         uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="汪喵平安守護已啟動", contents=card))
@@ -323,15 +324,15 @@ def on_text(event):
         if len(f_ids) > 0:
             invite_bubble = BubbleContainer(
                 size="mega",
-                header=BoxComponent(layout="vertical", background_color="#5856D6", padding_all="14px", contents=[
+                header=BoxComponent(layout="vertical", background_color="#7950F2", padding_all="14px", contents=[
                     TextComponent(text=f"📹 {p_name} · 遠端視訊看毛孩邀請", weight="bold", size="md", color="#FFFFFF", wrap=True)
                 ]),
-                body=BoxComponent(layout="vertical", spacing="sm", contents=[
-                    TextComponent(text=f"照護者「{uname}」已開啟專屬視訊室，快進來看看「{p_name}」現在可愛的模樣吧！", size="sm", weight="bold", color="#111111", wrap=True),
-                    TextComponent(text="點擊下方紫色按鈕即可透過瀏覽器直接加入視訊（免下載任何 App）：", size="xs", color="#555555", wrap=True)
+                body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                    TextComponent(text=f"照護者「{uname}」已開啟專屬視訊室，快進來看看「{p_name}」現在可愛的模樣吧！", size="sm", weight="bold", color="#3D2C2E", wrap=True),
+                    TextComponent(text="點擊下方紫色按鈕即可透過瀏覽器直接加入視訊（免下載任何 App）：", size="xs", color="#666666", wrap=True)
                 ]),
-                footer=BoxComponent(layout="vertical", contents=[
-                    ButtonComponent(style="primary", color="#5856D6", height="sm", action=URIAction(label="📹 立即加入視訊看毛孩", uri=video_uri))
+                footer=BoxComponent(layout="vertical", background_color="#FFFDF9", contents=[
+                    ButtonComponent(style="primary", color="#7950F2", height="sm", action=URIAction(label="📹 立即加入視訊看毛孩", uri=video_uri))
                 ])
             )
             for fid in f_ids:
@@ -342,15 +343,15 @@ def on_text(event):
 
         self_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#5856D6", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#7950F2", padding_all="14px", contents=[
                 TextComponent(text="📹 專屬視訊看毛孩室已建立", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="sm", contents=[
-                TextComponent(text=f"已同步發送視訊邀請給 {len(f_ids)} 位家人／飼主！" if len(f_ids) > 0 else "視訊室已準備就緒（尚未綁定家人時也可直接開啟）！", size="sm", weight="bold", color="#111111", wrap=True),
-                TextComponent(text="點擊下方紫色按鈕即可開啟手機鏡頭，與家人一起看看毛孩狀況：", size="xs", color="#555555", wrap=True)
+            body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                TextComponent(text=f"已同步發送視訊邀請給 {len(f_ids)} 位家人／飼主！" if len(f_ids) > 0 else "視訊室已準備就緒（尚未綁定家人時也可直接開啟）！", size="sm", weight="bold", color="#3D2C2E", wrap=True),
+                TextComponent(text="點擊下方紫色按鈕即可開啟手機鏡頭，與家人一起看看毛孩狀況：", size="xs", color="#666666", wrap=True)
             ]),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=[
-                ButtonComponent(style="primary", color="#5856D6", height="sm", action=URIAction(label="📹 立即開啟視訊鏡頭", uri=video_uri)),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#7950F2", height="sm", action=URIAction(label="📹 立即開啟視訊鏡頭", uri=video_uri)),
                 ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日寵物照護日報", text="今日日報"))
             ])
         )
@@ -411,15 +412,15 @@ def on_text(event):
         note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
         guide_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="✍️ 新增毛孩特別狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="sm", contents=[
-                TextComponent(text="請點擊下方按鈕（自動帶入「狀況:」），或直接在對話框輸入「狀況:內容」送出即可！", size="xs", color="#333333", wrap=True),
+            body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                TextComponent(text="請點擊下方按鈕（自動帶入「狀況:」），或直接在對話框輸入「狀況:內容」送出即可！", size="xs", color="#3D2C2E", wrap=True),
                 TextComponent(text="💡 範例：狀況:今天在陽台曬太陽睡著了，精神很好", size="xxs", color="#888888", wrap=True)
             ]),
-            footer=BoxComponent(layout="vertical", contents=[
-                ButtonComponent(style="primary", color="#FF9500", height="sm", action=URIAction(label="✍️ 點此輸入特別狀況", uri=note_uri))
+            footer=BoxComponent(layout="vertical", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#FF922B", height="sm", action=URIAction(label="✍️ 點此輸入特別狀況", uri=note_uri))
             ])
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="新增毛孩特別狀況", contents=guide_card))
@@ -453,7 +454,7 @@ def on_text(event):
         res = call_sheet({"action": "get_today_items", "user_id": uid})
         items = res.get("items", [])
         body_items = [
-            TextComponent(text="如需修改或刪除今日狀況，請點下方對應項目：", size="xs", color="#555555", wrap=True),
+            TextComponent(text="如需修改或刪除今日狀況，請點下方對應項目：", size="xs", color="#3D2C2E", wrap=True),
             TextComponent(text="• 點「✏️ 改」：可直接輸入新文字覆蓋該筆狀況內容\n• 點「❌ 刪」：立即刪除該筆錯誤紀錄", size="xxs", color="#888888", wrap=True)
         ]
         footer_items = []
@@ -474,16 +475,16 @@ def on_text(event):
                 )
 
         footer_items.append(
-            ButtonComponent(style="primary", color="#2C3E50", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報"))
+            ButtonComponent(style="primary", color="#FF6B4A", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報"))
         )
 
         edit_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="✏️ 修改／刪除今日照護狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="md", contents=body_items),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=footer_items)
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=body_items),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_items)
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="修改／刪除今日照護狀況", contents=edit_card))
         return
@@ -514,19 +515,19 @@ def on_text(event):
         cur_t = st.get("care_times", "尚未設定")
         rem_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="⏰ 汪喵定時放飯／保健鬧鐘", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="md", contents=[
-                TextComponent(text=f"目前設定時段：{cur_t}", size="sm", weight="bold", color="#111111", wrap=True),
-                TextComponent(text="時間一到，系統會自動推播提醒卡片，點一下「✅ 已放飯換水」即可順便完成交班！", size="xs", color="#555555", wrap=True),
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
+                TextComponent(text=f"目前設定時段：{cur_t}", size="sm", weight="bold", color="#3D2C2E", wrap=True),
+                TextComponent(text="時間一到，系統會自動推播提醒卡片，點一下「✅ 已放飯換水」即可順便完成交班！", size="xs", color="#666666", wrap=True),
                 BoxComponent(layout="horizontal", spacing="sm", contents=[
                     ButtonComponent(style="secondary", height="sm", action=MessageAction(label="早晚8點", text="放飯:08:00, 20:00")),
                     ButtonComponent(style="secondary", height="sm", action=MessageAction(label="早中晚三餐", text="放飯:08:00, 13:00, 19:00"))
                 ])
             ]),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=[
-                ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="✏️ 自訂多時段（如 08:30, 21:00）", uri=custom_uri)),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#339AF0", height="sm", action=URIAction(label="✏️ 自訂多時段（如 08:30, 21:00）", uri=custom_uri)),
                 ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🔕 關閉放飯提醒", text="放飯:關閉"))
             ])
         )
@@ -549,16 +550,16 @@ def on_text(event):
 
         phone_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="📞 飼主緊急電話管理", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="md", contents=[
-                TextComponent(text=f"目前登記號碼：{cur_phone}", size="sm", weight="bold", color="#111111", wrap=True),
-                TextComponent(text="您可以點擊下方按鈕輸入新號碼覆蓋修改，或直接刪除目前的緊急聯絡電話：", size="xs", color="#555555", wrap=True)
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
+                TextComponent(text=f"目前登記號碼：{cur_phone}", size="sm", weight="bold", color="#3D2C2E", wrap=True),
+                TextComponent(text="您可以點擊下方按鈕輸入新號碼覆蓋修改，或直接刪除目前的緊急聯絡電話：", size="xs", color="#666666", wrap=True)
             ]),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=[
-                ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="✏️ 輸入／修改新號碼", uri=edit_phone_uri)),
-                ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🗑️ 刪除目前飼主電話", text="刪除飼主電話")),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#339AF0", height="sm", action=URIAction(label="✏️ 輸入／修改新號碼", uri=edit_phone_uri)),
+                ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🗑️ 刪除目前飼主電話", text="刪除飼主電話")),
                 ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報"))
             ])
         )
@@ -591,7 +592,7 @@ def on_text(event):
         card = make_pet_card(
             "📞 飼主緊急直撥電話已設定",
             f"緊急聯絡號碼：{p_val}",
-            "現在只要點擊下方橘色撥打按鈕，即可直接喚醒手機撥號盤聯繫飼主！",
+            "現在只要點擊下方蜜桃橘撥打按鈕，即可直接喚醒手機撥號盤聯繫飼主！",
             uid, lat=lat, lon=lon, addr=loc_str, owner_phone=p_val
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急直撥電話已設定", contents=card))
@@ -606,17 +607,17 @@ def on_text(event):
 
         addr_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="🏠 毛孩住家／寄宿地址管理", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="md", contents=[
-                TextComponent(text=f"目前登記位置：{cur_loc}", size="sm", weight="bold", color="#111111", wrap=True),
-                TextComponent(text="您可以直接打字輸入門牌地址（例如：地址:新北市五股區成泰路一段100號），或傳送 GPS 定位座標：", size="xs", color="#555555", wrap=True)
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
+                TextComponent(text=f"目前登記位置：{cur_loc}", size="sm", weight="bold", color="#3D2C2E", wrap=True),
+                TextComponent(text="您可以直接打字輸入門牌地址（例如：地址:新北市五股區成泰路一段100號），或傳送 GPS 定位座標：", size="xs", color="#666666", wrap=True)
             ]),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=[
-                ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="✏️ 直接輸入／修改文字地址", uri=edit_addr_uri)),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
+                ButtonComponent(style="primary", color="#339AF0", height="sm", action=URIAction(label="✏️ 直接輸入／修改文字地址", uri=edit_addr_uri)),
                 ButtonComponent(style="secondary", height="sm", action=URIAction(label="📍 傳送 GPS 定位座標", uri=loc_uri)),
-                ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🗑️ 刪除目前登記地址", text="刪除地址")),
+                ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🗑️ 刪除目前登記地址", text="刪除地址")),
                 ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報"))
             ])
         )
@@ -666,8 +667,8 @@ def on_text(event):
         f_ids = st.get("family_ids", [])
 
         body_contents = [
-            TextComponent(text=f"目前已綁定守護人員：{len(f_ids)} 位（不限人數上限）", size="sm", weight="bold", color="#111111"),
-            TextComponent(text="照護打卡與視訊邀請會同步發送給以下所有成員。如需移除特定家人／保母，請直接點擊下方移除按鈕：", size="xs", color="#555555", wrap=True)
+            TextComponent(text=f"目前已綁定守護人員：{len(f_ids)} 位（不限人數上限）", size="sm", weight="bold", color="#3D2C2E"),
+            TextComponent(text="照護打卡與視訊邀請會同步發送給以下所有成員。如需移除特定家人／保母，請直接點擊下方移除按鈕：", size="xs", color="#666666", wrap=True)
         ]
         footer_btns = []
 
@@ -681,19 +682,19 @@ def on_text(event):
                     ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"❌ 移除：{disp_f}"[:38], text=f"移除人員:{fid}"))
                 )
             footer_btns.append(
-                ButtonComponent(style="primary", color="#FF3B30", height="sm", action=MessageAction(label="🗑️ 一鍵清空全部人員名單", text="清空人員"))
+                ButtonComponent(style="primary", color="#FA5252", height="sm", action=MessageAction(label="🗑️ 一鍵清空全部人員名單", text="清空人員"))
             )
 
-        footer_btns.append(ButtonComponent(style="primary", color="#007AFF", height="sm", action=URIAction(label="➕ 新增家人／保母（不限人數）", uri=share_uri)))
+        footer_btns.append(ButtonComponent(style="primary", color="#339AF0", height="sm", action=URIAction(label="➕ 新增家人／保母（不限人數）", uri=share_uri)))
         footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報")))
 
         fam_card = BubbleContainer(
             size="mega",
-            header=BoxComponent(layout="vertical", background_color="#2C3E50", padding_all="14px", contents=[
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
                 TextComponent(text="👥 家人／保母人員管理（新增與移除）", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
-            body=BoxComponent(layout="vertical", spacing="md", contents=body_contents),
-            footer=BoxComponent(layout="vertical", spacing="sm", contents=footer_btns)
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=body_contents),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_btns)
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="家人／保母人員管理", contents=fam_card))
         return
@@ -729,7 +730,7 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 8. 查看今日寵物照護日報（完整清爽專業的單一頁面）
+    # 8. 查看今日寵物照護日報（時尚活潑單一主畫面）
     st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
     p_name = st.get("pet_name", "毛孩寶貝")
     f_cnt = st.get("family_count", 0)
@@ -737,7 +738,7 @@ def on_text(event):
     c_times = st.get("care_times", "尚未設定")
     loc_str = st.get("last_location", "尚未設定")
     logs = st.get("today_logs", [])
-    logs_txt = "\n".join(logs) if len(logs) > 0 else "（今日尚無紀錄，點擊下方快捷按鈕即可開始交班）"
+    logs_txt = "\n".join(logs) if len(logs) > 0 else "（今日尚無紀錄，點擊下方馬卡龍按鈕即可快樂交班）"
 
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
