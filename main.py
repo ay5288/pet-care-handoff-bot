@@ -64,6 +64,20 @@ PET_MAP_HTML = """<!DOCTYPE html><html><head><meta charset="UTF-8">
   </div>
 </div>
 </body></html>"""
+ACTIVE_PET_MAP = {}
+PET_LIST_MAP = {}
+
+def get_pet_scope(uid: str, default_name: str = "毛孩寶貝"):
+    pets = PET_LIST_MAP.get(uid, [])
+    active = ACTIVE_PET_MAP.get(uid, "")
+    if not active:
+        active = pets[0] if len(pets) > 0 else default_name
+    if active and active not in pets:
+        pets.append(active)
+        PET_LIST_MAP[uid] = pets
+    scope_uid = uid if active == default_name else f"{uid}#{active}"
+    return scope_uid, active, pets
+
 def latlon_to_pixel(lat, lon, z=16):
     n = 2.0 ** z
     x = (float(lon) + 180.0) / 360.0 * n * 256.0
@@ -89,15 +103,16 @@ def call_sheet(payload: dict):
         return {}
 
 def get_user_name(uid: str):
+    base_uid = uid.split("#")[0] if "#" in uid else uid
     try:
-        profile = line_bot_api.get_profile(uid)
+        profile = line_bot_api.get_profile(base_uid)
         return profile.display_name
     except Exception:
         return "照護者"
 
 @app.get("/")
 def root():
-    return {"status": "Online", "service": "Pet Care Handoff Bot"}
+    return {"status": "Online", "service": "Pet Care Handoff Bot Multi-Pet"}
 
 @app.get("/call", response_class=HTMLResponse)
 def direct_call_page(num: str, name: str = "飼主緊急電話"):
@@ -193,11 +208,11 @@ def pet_map_view(lat: float, lon: float, addr: str = "毛孩住家"):
     return HTMLResponse(content=html)
 def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=None, lon=None, addr="尚未設定", owner_phone: str = "尚未設定"):
     S = chr(47)
-    bind_cmd = urllib.parse.quote(f"綁定人員:{uid}")
+    base_uid = uid.split("#")[0] if "#" in uid else uid
+    bind_cmd = urllib.parse.quote(f"綁定人員:{base_uid}")
     share_text = urllib.parse.quote(f"邀請您加入「汪喵平安守護 ＆ 寵物照護日記」守護群（不限人數）！點擊下方連結加入後，每次餵食、鏟屎、散步或異常狀況，您都會即時收到通知：\nhttps:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{bind_cmd}")
     share_uri = f"https:{S}{S}line.me{S}R{S}share?text={share_text}"
 
-    # 一鍵轉傳今日交班摘要卡給家庭群組或飼主（病毒式裂變推廣）
     summary_only = next(iter(status_text.split("🏠 位置："))).strip()
     report_share_txt = urllib.parse.quote(f"🐾【{title}】\n{summary_only}\n\n📲 免費使用「汪喵平安守護」一鍵打卡＋視訊看毛孩：\nhttps:{S}{S}line.me{S}R{S}ti{S}p{S}{LINE_BOT_BASIC_ID}")
     report_share_uri = f"https:{S}{S}line.me{S}R{S}share?text={report_share_txt}"
@@ -207,7 +222,7 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
     pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('毛孩:')}"
     clean_phone = re.sub(r"[^0-9]", "", str(owner_phone or ""))
 
-    # 1. 智慧健康狀態橫幅 ＋ 今日照護完成度進度條 (Progress Bar)
+    # 1. 智慧健康狀態橫幅 ＋ 今日照護完成度進度條
     has_alert = ("🚨" in status_text) or ("異常" in status_text)
     feed_cnt = status_text.count("餵食：")
     poop_cnt = status_text.count("排泄：")
@@ -268,18 +283,22 @@ def make_pet_card(title: str, subtitle: str, status_text: str, uid: str, lat=Non
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="✍️ 記狀況", uri=note_uri)),
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="📤 轉傳交班", uri=report_share_uri))
         ]),
-        TextComponent(text="⚙️ 守護群與毛孩檔案設定", size="xxs", color="#868E96", weight="bold", margin="md"),
+        TextComponent(text="🐾 多隻毛孩與守護群設定", size="xxs", color="#868E96", weight="bold", margin="md"),
+        BoxComponent(layout="horizontal", spacing="sm", contents=[
+            ButtonComponent(style="primary", color="#FF6B4A", height="sm", action=MessageAction(label="🐾 切換毛孩", text="切換毛孩")),
+            ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 新增毛孩", uri=pet_uri))
+        ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
             ButtonComponent(style="secondary", height="sm", action=URIAction(label="➕ 邀家人", uri=share_uri)),
             ButtonComponent(style="secondary", height="sm", action=MessageAction(label="👥 管人員", text="管理人員"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=URIAction(label="🐶 改毛孩名", uri=pet_uri)),
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況"))
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="✏️ 改刪狀況", text="修改狀況")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 設鬧鐘", text="餵食時間"))
         ]),
         BoxComponent(layout="horizontal", spacing="sm", contents=[
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="⏰ 設鬧鐘", text="餵食時間")),
-            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 設地址", text="管理地址"))
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🏠 設地址", text="管理地址")),
+            ButtonComponent(style="secondary", height="sm", action=MessageAction(label="🔄 刷新日報", text="今日日報"))
         ])
     ]
 
@@ -335,15 +354,16 @@ async def callback(request: Request):
 def on_follow(event):
     uid = event.source.user_id
     uname = get_user_name(uid)
-    st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+    scope_uid, active_pet, _ = get_pet_scope(uid)
+    st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     o_phone = st.get("owner_phone", "尚未設定")
     loc_str = st.get("last_location", "尚未設定")
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
-        "🐾 汪喵平安守護 ＆ 照護日記 · 已啟動",
-        f"嗨 {uname}！歡迎開啟毛孩快樂守護日常：",
-        "點擊下方馬卡龍快捷按鈕（放飯、鏟屎、散步、視訊或記狀況），已綁定的家人與飼主都會即時收到通知！",
-        uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        f"🐾 {active_pet} · 汪喵平安守護已啟動",
+        f"嗨 {uname}！支援多隻毛孩獨立檔案切換：",
+        "點擊下方馬卡龍快捷按鈕（放飯、鏟屎、散步、視訊或新增毛孩），已綁定的家人與飼主都會即時收到通知！",
+        scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="汪喵平安守護已啟動", contents=card))
 
@@ -351,16 +371,17 @@ def on_follow(event):
 def on_location(event):
     uid = event.source.user_id
     uname = get_user_name(uid)
+    scope_uid, active_pet, _ = get_pet_scope(uid)
     addr = event.message.address or "已定位座標"
     lat, lon = event.message.latitude, event.message.longitude
-    call_sheet({"action": "location", "user_id": uid, "user_name": uname, "address": addr, "lat": lat, "lon": lon})
-    st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+    call_sheet({"action": "location", "user_id": scope_uid, "user_name": uname, "address": addr, "lat": lat, "lon": lon})
+    st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     o_phone = st.get("owner_phone", "尚未設定")
     card = make_pet_card(
-        "📍 毛孩住家／寄宿定位與獸醫院地圖已開通",
+        f"📍 {active_pet} · 住家與急診獸醫院地圖已開通",
         "已將此位置設為毛孩的照護座標：",
         f"🏠 登記位置：{addr}\n🏥 點擊下方紅色地圖按鈕，即可搜尋附近 24小時急診獸醫院！",
-        uid, lat=lat, lon=lon, addr=addr, owner_phone=o_phone
+        scope_uid, lat=lat, lon=lon, addr=addr, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩定位更新成功", contents=card))
 
@@ -369,11 +390,12 @@ def on_text(event):
     uid = event.source.user_id
     uname = get_user_name(uid)
     txt = event.message.text.strip()
+    scope_uid, active_pet, pet_list = get_pet_scope(uid)
 
     # 0. 一鍵開啟專屬視訊看毛孩並同步通知所有人員
     if txt in ["開啟視訊", "視訊", "視訊看毛孩", "打視訊"]:
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
-        p_name = st.get("pet_name", "毛孩寶貝")
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+        p_name = active_pet
         f_ids = st.get("family_ids", [])
         room_code = uid[-12:] if len(uid) >= 12 else uid
         video_uri = f"{RENDER_BASE_URL}/video?room={room_code}&pet={urllib.parse.quote(p_name)}&openExternalBrowser=1"
@@ -401,7 +423,7 @@ def on_text(event):
         self_card = BubbleContainer(
             size="mega",
             header=BoxComponent(layout="vertical", background_color="#7048E8", padding_all="14px", contents=[
-                TextComponent(text="📹 專屬視訊看毛孩室已建立", weight="bold", size="md", color="#FFFFFF", wrap=True)
+                TextComponent(text=f"📹 {p_name} · 專屬視訊看毛孩室已建立", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
             body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
                 TextComponent(text=f"已同步發送視訊邀請給 {len(f_ids)} 位家人／飼主！" if len(f_ids) > 0 else "視訊室已準備就緒（尚未綁定家人時也可直接開啟）！", size="sm", weight="bold", color="#3D2C2E", wrap=True),
@@ -414,104 +436,12 @@ def on_text(event):
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="專屬視訊室已建立", contents=self_card))
         return
-    # 1. 處理日常一鍵照護打卡（格式：紀錄:類別:詳細內容）
-    if txt.startswith("紀錄:"):
-        parts = txt.split(":", 2)
-        _ = parts.pop(0)
-        cat = parts.pop(0) if parts else "照護紀錄"
-        detail = parts.pop(0) if parts else txt
-        res = call_sheet({"action": "log_care", "user_id": uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": False})
-        t_str = res.get("time", "剛剛")
-        f_cnt = res.get("family_count", 0)
-        pet_n = res.get("pet_name", "毛孩寶貝")
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
-        o_phone = st.get("owner_phone", "尚未設定")
-        loc_str = st.get("last_location", "尚未設定")
-        lat, lon = parse_latlon(loc_str)
-
-        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（點下方「➕ 邀家人」可邀請加入）"
-        card = make_pet_card(
-            f"✅ {cat}已紀錄完成",
-            f"毛孩：{pet_n}　｜　時間：{t_str}",
-            f"📋 狀況內容：{detail}\n🔔 通知狀態：{notify_note}",
-            uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
-        )
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"{cat}紀錄完成", contents=card))
-        return
-
-    # 1-1. 處理異常健康狀況預警（格式：異常:類別:詳細內容）
-    if txt.startswith("異常:"):
-        parts = txt.split(":", 2)
-        _ = parts.pop(0)
-        cat = parts.pop(0) if parts else "健康異常"
-        detail = parts.pop(0) if parts else txt
-        res = call_sheet({"action": "log_care", "user_id": uid, "user_name": uname, "category": cat, "detail": detail, "is_abnormal": True})
-        t_str = res.get("time", "剛剛")
-        f_cnt = res.get("family_count", 0)
-        pet_n = res.get("pet_name", "毛孩寶貝")
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
-        o_phone = st.get("owner_phone", "尚未設定")
-        loc_str = st.get("last_location", "尚未設定")
-        lat, lon = parse_latlon(loc_str)
-
-        card = make_pet_card(
-            "🚨 毛孩異常狀況已記錄並通報！",
-            f"毛孩：{pet_n}　｜　時間：{t_str}",
-            f"⚠️ 異常內容：{detail}\n🔔 已優先發送警報通知 {f_cnt} 位家人／飼主！如需就醫請點下方紅色地圖按鈕。",
-            uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
-        )
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩異常狀況通報", contents=card))
-        return
-
-    # 1-2. 新增其他特別狀況（支援底部選單按鈕或直接輸入）
-    if txt in ["新增狀況", "新增特別狀況"]:
-        S = chr(47)
-        note_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('狀況:')}"
-        guide_card = BubbleContainer(
-            size="mega",
-            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
-                TextComponent(text="✍️ 新增毛孩特別狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
-            ]),
-            body=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=[
-                TextComponent(text="請點擊下方按鈕（自動帶入「狀況:」），或直接在對話框輸入「狀況:內容」送出即可！", size="xs", color="#3D2C2E", wrap=True),
-                TextComponent(text="💡 範例：狀況:今天在陽台曬太陽睡著了，精神很好", size="xxs", color="#888888", wrap=True)
-            ]),
-            footer=BoxComponent(layout="vertical", background_color="#FFFDF9", contents=[
-                ButtonComponent(style="primary", color="#FD7E14", height="sm", action=URIAction(label="✍️ 點此輸入特別狀況", uri=note_uri))
-            ])
-        )
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="新增毛孩特別狀況", contents=guide_card))
-        return
-
-    if txt.startswith("狀況:") or txt.startswith("狀況：") or txt.startswith("備忘:") or txt.startswith("備忘："):
-        note_content = txt[3:].strip()
-        if not note_content:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✍️ 請在「狀況:」後面直接輸入毛孩的特別狀況喔！\n例如：狀況:今天在陽台曬太陽睡著了，精神很好"))
-            return
-        res = call_sheet({"action": "log_care", "user_id": uid, "user_name": uname, "category": "特別狀況", "detail": note_content, "is_abnormal": False})
-        t_str = res.get("time", "剛剛")
-        f_cnt = res.get("family_count", 0)
-        pet_n = res.get("pet_name", "毛孩寶貝")
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
-        o_phone = st.get("owner_phone", "尚未設定")
-        loc_str = st.get("last_location", "尚未設定")
-        lat, lon = parse_latlon(loc_str)
-
-        notify_note = f"✅ 已同步通知 {f_cnt} 位家人／飼主！" if f_cnt > 0 else "💡 尚未綁定家人／保母（點下方「➕ 邀家人」可邀請加入）"
-        card = make_pet_card(
-            "✍️ 特別狀況已新增完成",
-            f"毛孩：{pet_n}　｜　時間：{t_str}",
-            f"📝 狀況內容：{note_content}\n🔔 通知狀態：{notify_note}",
-            uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
-        )
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="特別狀況新增完成", contents=card))
-        return
     # 2. 修改／刪除今日已記錄的照護狀況（支援文字覆蓋修改與單筆刪除）
     if txt in ["修改狀況", "刪除狀況", "修改紀錄", "編輯狀況"]:
-        res = call_sheet({"action": "get_today_items", "user_id": uid})
+        res = call_sheet({"action": "get_today_items", "user_id": scope_uid})
         items = res.get("items", [])
         body_items = [
-            TextComponent(text="如需修改或刪除今日狀況，請點下方對應項目：", size="xs", color="#3D2C2E", wrap=True),
+            TextComponent(text=f"目前管理對象：【{active_pet}】", size="sm", weight="bold", color="#FF6B4A", wrap=True),
             TextComponent(text="• 點「✏️ 改」：可直接輸入新文字覆蓋該筆狀況內容\n• 點「❌ 刪」：立即刪除該筆錯誤紀錄", size="xxs", color="#888888", wrap=True)
         ]
         footer_items = []
@@ -538,7 +468,7 @@ def on_text(event):
         edit_card = BubbleContainer(
             size="mega",
             header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
-                TextComponent(text="✏️ 修改／刪除今日照護狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
+                TextComponent(text=f"✏️ 修改／刪除「{active_pet}」今日狀況", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
             body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=body_items),
             footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_items)
@@ -552,28 +482,28 @@ def on_text(event):
         row_num = parts.pop(0).strip() if parts else ""
         new_text = parts.pop(0).strip() if parts else ""
         if row_num and new_text:
-            call_sheet({"action": "edit_log", "user_id": uid, "row_num": row_num, "detail": new_text})
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ 已成功修改該筆狀況為：「{new_text}」！\n輸入「今日日報」可查看最新完整紀錄。"))
+            call_sheet({"action": "edit_log", "user_id": scope_uid, "row_num": row_num, "detail": new_text})
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ 已成功修改「{active_pet}」的該筆狀況為：「{new_text}」！\n輸入「今日日報」可查看最新完整紀錄。"))
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 請在冒號後面輸入修改後的狀況文字喔！"))
         return
 
     if txt.startswith("刪狀況:"):
         row_num = txt[4:].strip()
-        call_sheet({"action": "delete_log", "user_id": uid, "row_num": row_num})
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ 已成功刪除該筆錯誤狀況紀錄！\n請點擊主畫面上的按鈕重新記錄正確狀態。"))
+        call_sheet({"action": "delete_log", "user_id": scope_uid, "row_num": row_num})
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ 已成功刪除「{active_pet}」的該筆錯誤狀況紀錄！\n請點擊主畫面上的按鈕重新記錄正確狀態。"))
         return
 
     # 3. 設定每日定時放飯／保健提醒時間（HH:MM）
     if txt in ["餵食時間", "放飯時間", "鬧鐘設定"]:
         S = chr(47)
         custom_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('放飯:')}"
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         cur_t = st.get("care_times", "尚未設定")
         rem_card = BubbleContainer(
             size="mega",
             header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
-                TextComponent(text="⏰ 汪喵定時放飯／保健鬧鐘", weight="bold", size="md", color="#FFFFFF", wrap=True)
+                TextComponent(text=f"⏰ {active_pet} · 定時放飯／保健鬧鐘", weight="bold", size="md", color="#FFFFFF", wrap=True)
             ]),
             body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=[
                 TextComponent(text=f"目前設定時段：{cur_t}", size="sm", weight="bold", color="#3D2C2E", wrap=True),
@@ -593,8 +523,8 @@ def on_text(event):
 
     if txt.startswith("放飯:") or txt.startswith("放飯："):
         t_val = txt[3:].strip().replace("，", ", ").replace("：", ":")
-        call_sheet({"action": "set_care_times", "user_id": uid, "user_name": uname, "care_times": t_val})
-        msg = "🔕 已關閉每日定時放飯提醒。" if t_val == "關閉" else f"🥣 設定成功！系統將於每天【{t_val}】準時推播放飯換水提醒卡片！"
+        call_sheet({"action": "set_care_times", "user_id": scope_uid, "user_name": uname, "care_times": t_val})
+        msg = f"🔕 已關閉「{active_pet}」的每日定時放飯提醒。" if t_val == "關閉" else f"🥣 設定成功！系統將於每天【{t_val}】準時推播「{active_pet}」的放飯換水提醒卡片！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
@@ -602,7 +532,7 @@ def on_text(event):
     if txt in ["管理飼主電話", "修改飼主電話", "飼主電話"]:
         S = chr(47)
         edit_phone_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('飼主電話:')}"
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         cur_phone = st.get("owner_phone", "尚未設定")
 
         phone_card = BubbleContainer(
@@ -624,15 +554,15 @@ def on_text(event):
         return
 
     if txt in ["刪除飼主電話", "清除飼主電話"]:
-        call_sheet({"action": "set_owner_phone", "user_id": uid, "user_name": uname, "phone": "尚未設定"})
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        call_sheet({"action": "set_owner_phone", "user_id": scope_uid, "user_name": uname, "phone": "尚未設定"})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         loc_str = st.get("last_location", "尚未設定")
         lat, lon = parse_latlon(loc_str)
         card = make_pet_card(
             "🗑️ 飼主緊急電話已刪除",
             "已清空原本登記的飼主聯絡號碼",
             "主畫面按鈕已恢復為「📞 設定飼主緊急電話」，隨時可重新設定新號碼！",
-            uid, lat=lat, lon=lon, addr=loc_str, owner_phone="尚未設定"
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone="尚未設定"
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急電話已刪除", contents=card))
         return
@@ -642,15 +572,15 @@ def on_text(event):
         if not p_val:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 請在「飼主電話:」後面輸入手機或市話號碼喔！\n例如：飼主電話:0912345678"))
             return
-        call_sheet({"action": "set_owner_phone", "user_id": uid, "user_name": uname, "phone": p_val})
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        call_sheet({"action": "set_owner_phone", "user_id": scope_uid, "user_name": uname, "phone": p_val})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         loc_str = st.get("last_location", "尚未設定")
         lat, lon = parse_latlon(loc_str)
         card = make_pet_card(
             "📞 飼主緊急直撥電話已設定",
             f"緊急聯絡號碼：{p_val}",
             "現在只要點擊下方橘色撥打按鈕，即可直接喚醒手機撥號盤聯繫飼主！",
-            uid, lat=lat, lon=lon, addr=loc_str, owner_phone=p_val
+            scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=p_val
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="飼主緊急直撥電話已設定", contents=card))
         return
@@ -659,7 +589,7 @@ def on_text(event):
         S = chr(47)
         edit_addr_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('地址:')}"
         loc_uri = f"https:{S}{S}line.me{S}R{S}nv{S}location{S}"
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         cur_loc = st.get("last_location", "尚未設定")
 
         addr_card = BubbleContainer(
@@ -686,8 +616,8 @@ def on_text(event):
         if not addr_val:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 請在「地址:」後面輸入完整住家或寵物旅館地址喔！"))
             return
-        res = call_sheet({"action": "set_address", "user_id": uid, "user_name": uname, "address": addr_val})
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        res = call_sheet({"action": "set_address", "user_id": scope_uid, "user_name": uname, "address": addr_val})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         o_phone = st.get("owner_phone", "尚未設定")
         new_loc = res.get("last_location", addr_val)
         lat, lon = parse_latlon(new_loc)
@@ -695,20 +625,20 @@ def on_text(event):
             "🏠 毛孩住家／寄宿地址已更新",
             f"登記地址：{new_loc}",
             "現在點擊下方紅色地圖按鈕，即可直接搜尋附近 24小時急診獸醫院與寵物旅館！",
-            uid, lat=lat, lon=lon, addr=new_loc, owner_phone=o_phone
+            scope_uid, lat=lat, lon=lon, addr=new_loc, owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址已更新", contents=card))
         return
 
     if txt in ["刪除地址", "清除地址"]:
-        call_sheet({"action": "set_address", "user_id": uid, "user_name": uname, "address": "尚未設定"})
-        st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
+        call_sheet({"action": "set_address", "user_id": scope_uid, "user_name": uname, "address": "尚未設定"})
+        st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
         o_phone = st.get("owner_phone", "尚未設定")
         card = make_pet_card(
             "🗑️ 毛孩住家地址已刪除",
             "已清空原本登記的地址與定位座標",
             "隨時可點擊下方「🏠 設地址」重新登記新位置！",
-            uid, addr="尚未設定", owner_phone=o_phone
+            scope_uid, addr="尚未設定", owner_phone=o_phone
         )
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="毛孩住家地址已刪除", contents=card))
         return
@@ -767,13 +697,99 @@ def on_text(event):
         call_sheet({"action": "clear_family", "user_id": uid})
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🗑️ 已為您清空所有家人／保母人員名單！隨時可透過邀請連結重新加入。"))
         return
+    # 7. 多隻毛孩獨立檔案管理：切換毛孩、新增毛孩、刪除毛孩與綁定人員
+    if txt in ["切換毛孩", "多隻毛孩", "毛孩名單", "管理毛孩"]:
+        S = chr(47)
+        add_pet_uri = f"https:{S}{S}line.me{S}R{S}oaMessage{S}{LINE_BOT_BASIC_ID}{S}?{urllib.parse.quote('毛孩:')}"
+        body_items = [
+            TextComponent(text=f"目前正在管理：【{active_pet}】", size="sm", weight="bold", color="#FF6B4A", wrap=True),
+            TextComponent(text="每隻毛孩皆擁有獨立的放飯、鏟屎、散步統計與紀錄表，互不干擾。請點擊下方按鈕一鍵切換對象：", size="xs", color="#666666", wrap=True)
+        ]
+        footer_btns = []
+        for p_item in pet_list:
+            is_cur = (p_item == active_pet)
+            footer_btns.append(
+                ButtonComponent(
+                    style="primary" if is_cur else "secondary",
+                    color="#12B886" if is_cur else None,
+                    height="sm",
+                    action=MessageAction(label=f"{'✅ 目前：' if is_cur else '🐾 切換至：'}{p_item}"[:38], text=f"切換至:{p_item}")
+                )
+            )
+            if len(pet_list) > 1 and not is_cur:
+                footer_btns.append(
+                    ButtonComponent(style="secondary", height="sm", action=MessageAction(label=f"🗑️ 刪除毛孩檔案：{p_item}"[:38], text=f"刪毛孩:{p_item}"))
+                )
 
-    # 7. 設定毛孩名字與綁定人員
+        footer_btns.append(ButtonComponent(style="primary", color="#228BE6", height="sm", action=URIAction(label="➕ 新增另一隻毛孩檔案", uri=add_pet_uri)))
+        footer_btns.append(ButtonComponent(style="secondary", height="sm", action=MessageAction(label="📊 返回今日日報", text="今日日報")))
+
+        switch_card = BubbleContainer(
+            size="mega",
+            header=BoxComponent(layout="vertical", background_color="#FF6B4A", padding_all="14px", contents=[
+                TextComponent(text=f"🐾 多隻毛孩檔案切換（共 {len(pet_list)} 隻）", weight="bold", size="md", color="#FFFFFF", wrap=True)
+            ]),
+            body=BoxComponent(layout="vertical", spacing="md", background_color="#FFFDF9", contents=body_items),
+            footer=BoxComponent(layout="vertical", spacing="sm", background_color="#FFFDF9", contents=footer_btns)
+        )
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="多隻毛孩檔案切換", contents=switch_card))
+        return
+
+    if txt.startswith("切換至:"):
+        target_p = txt[4:].strip()
+        if target_p:
+            if target_p not in pet_list:
+                pet_list.append(target_p)
+                PET_LIST_MAP[uid] = pet_list
+            ACTIVE_PET_MAP[uid] = target_p
+            scope_uid, active_pet, pet_list = get_pet_scope(uid)
+            st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+            o_phone = st.get("owner_phone", "尚未設定")
+            c_times = st.get("care_times", "尚未設定")
+            loc_str = st.get("last_location", "尚未設定")
+            logs = st.get("today_logs", [])
+            logs_txt = "\n".join(logs) if len(logs) > 0 else "（今日尚無紀錄，點擊下方馬卡龍按鈕即可為這隻毛孩打卡）"
+            lat, lon = parse_latlon(loc_str)
+            card = make_pet_card(
+                f"🐾 {active_pet} · 今日照護交班日報",
+                f"共 {len(pet_list)} 隻毛孩 ｜ 鬧鐘：{c_times}",
+                f"{logs_txt}\n\n🏠 位置：{loc_str}",
+                scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+            )
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"已切換至 {active_pet}", contents=card))
+        return
+
+    if txt.startswith("刪毛孩:"):
+        del_p = txt[4:].strip()
+        if del_p in pet_list and len(pet_list) > 1:
+            pet_list.remove(del_p)
+            PET_LIST_MAP[uid] = pet_list
+            if ACTIVE_PET_MAP.get(uid) == del_p:
+                ACTIVE_PET_MAP[uid] = pet_list[0]
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🗑️ 已移除毛孩「{del_p}」的切換標籤！目前切換回「{ACTIVE_PET_MAP[uid]}」。"))
+        return
+
     if txt.startswith("毛孩:") or txt.startswith("毛孩：") or txt.startswith("寵物:") or txt.startswith("寵物："):
         p_val = txt[3:].strip()
         if p_val:
-            call_sheet({"action": "set_pet", "user_id": uid, "user_name": uname, "pet_name": p_val})
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🐾 已將毛孩名字更新為「{p_val}」！接下來所有照護交班與視訊通知都會顯示這個名字。"))
+            if p_val not in pet_list:
+                pet_list.append(p_val)
+                PET_LIST_MAP[uid] = pet_list
+            ACTIVE_PET_MAP[uid] = p_val
+            scope_uid, active_pet, pet_list = get_pet_scope(uid)
+            call_sheet({"action": "set_pet", "user_id": scope_uid, "user_name": uname, "pet_name": p_val})
+            st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
+            o_phone = st.get("owner_phone", "尚未設定")
+            c_times = st.get("care_times", "尚未設定")
+            loc_str = st.get("last_location", "尚未設定")
+            lat, lon = parse_latlon(loc_str)
+            card = make_pet_card(
+                f"🐾 {p_val} · 專屬毛孩檔案已建立",
+                f"目前共有 {len(pet_list)} 隻毛孩 ｜ 鬧鐘：{c_times}",
+                f"已為「{p_val}」開啟獨立照護儀表板！所有放飯、鏟屎、散步統計都會獨立計算，點「🐾 切換毛孩」可隨時切換其他寶貝。\n\n🏠 位置：{loc_str}",
+                scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+            )
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text=f"已新增毛孩 {p_val}", contents=card))
         return
 
     if txt.startswith("綁定人員:"):
@@ -787,9 +803,8 @@ def on_text(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🤝 加入成功！您已成為「{p_name}」的第 {cnt} 位守護成員（不限人數上限）。\n只要照護者點擊放飯、鏟屎、散步、特別狀況或開啟視訊，您都會即時收到通知，每天 18:00 也會收到今日寵物照護日報！"))
         return
 
-    # 8. 查看今日寵物照護日報（旗艦 4.0 商業SaaS級終極版）
-    st = call_sheet({"action": "today_report", "user_id": uid, "user_name": uname})
-    p_name = st.get("pet_name", "毛孩寶貝")
+    # 8. 查看今日寵物照護日報（旗艦 5.0 多寵獨立檔案版）
+    st = call_sheet({"action": "today_report", "user_id": scope_uid, "user_name": uname})
     f_cnt = st.get("family_count", 0)
     o_phone = st.get("owner_phone", "尚未設定")
     c_times = st.get("care_times", "尚未設定")
@@ -799,9 +814,9 @@ def on_text(event):
 
     lat, lon = parse_latlon(loc_str)
     card = make_pet_card(
-        f"🐾 {p_name} · 今日照護交班日報",
-        f"守護群：{f_cnt} 位 ｜ 鬧鐘：{c_times}",
+        f"🐾 {active_pet} · 今日照護交班日報",
+        f"共 {len(pet_list)} 隻毛孩 ｜ 守護群：{f_cnt} 位 ｜ 鬧鐘：{c_times}",
         f"{logs_txt}\n\n🏠 位置：{loc_str}",
-        uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
+        scope_uid, lat=lat, lon=lon, addr=loc_str, owner_phone=o_phone
     )
     line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="今日寵物照護日報", contents=card))
